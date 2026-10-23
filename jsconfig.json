@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "target": "es2017",
+    "lib": ["es2017", "dom"],
+    "noImplicitAny": true,
+    "strictNullChecks": false,
+    "skipLibCheck": true,
+    "types": []
+  },
+  "include": ["js/**/*.js", "types/**/*.d.ts"]
+}

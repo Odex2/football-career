@@ -1,0 +1,21 @@
+/* the manager's Mercato tab (M8 phase D: js/ui-mgr-deal.js, js/ui-mgr-deal2.js) */
+.mkt .opts { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; align-items: center; }
+.mkt .opts button { background: var(--panel2); color: var(--text); border: 1px solid var(--line); font-weight: 500; padding: 6px 10px; font-size: 13px; }
+.mkt .opts button.on { background: var(--accent); color: #062018; border-color: var(--accent); font-weight: 700; }
+.mkt .opts select { font-size: 13px; padding: 5px 6px; }
+.mkt h4 { margin: 12px 0 6px; font-size: 14px; }
+.mktn { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 12px; }
+.mktn button { font-size: 13px; padding: 7px 11px; }
+.mktn button.on { background: var(--accent); color: #062018; border-color: var(--accent); font-weight: 700; }
+.mktf { margin-bottom: 4px; }
+.mkta { white-space: nowrap; }
+.mkta button { margin-right: 4px; }
+.mkd { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
+.mkt .row.small { gap: 8px; margin: 3px 0; }
+.sqt .sqcap.on { background: var(--accent); color: #062018; }
+@media (max-width: 700px) {
+  .mkm > summary { grid-template-columns: minmax(0, 1fr) 26px 46px 58px; }
+  .mkt .opts button { padding: 6px 8px; }
+}
+.sqt .sqcap { width: 34px; margin-right: 4px; text-align: center; }
+.sqt .sqgap { display: inline-block; width: 34px; margin-right: 4px; }

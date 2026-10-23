@@ -1,0 +1,28 @@
+/* the manager's academy and training (M8 phase E: js/ui-mgr-youth.js), the board's goals at the end (phase F) */
+.ysc { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0 8px; }
+.ysc select { font-size: 13px; padding: 5px 6px; max-width: 100%; }
+.yb { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid var(--line); }
+.yb .row { gap: 6px; margin: 0; }
+.yb .ywait { color: var(--mid); margin-top: 2px; }
+.ydev { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0; }
+.ydev .meter { width: 120px; }
+.trn { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.trn button { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; text-align: left; white-space: normal;
+  background: var(--panel2); color: var(--text); border: 1px solid var(--line); font-weight: 500; padding: 9px 11px; }
+.trn button small { color: var(--muted); font-size: 12px; line-height: 1.35; }
+.trn button.on { background: var(--accent); color: #062018; border-color: var(--accent); }
+.trn button.on small { color: #062018; }
+@media (max-width: 700px) { .trn { grid-template-columns: 1fr; } }
+/* the board's goals (M8 phase F: js/ui-mgr-board.js) */
+.goals .goal { display: flex; gap: 10px; align-items: flex-start; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.goals .goal .gi { font-size: 18px; line-height: 1.2; }
+.goals .goal .chip { font-size: 11px; padding: 1px 6px; }
+/* phase G: the assistant's switches and the season preview (js/ui-mgr-board.js), the save slots and the Hall of
+   Fame on the start screen (js/ui-end.js) */
+.notice .trn { margin: 8px 0; }
+.prev { display: grid; gap: 10px; }
+.prev .chip { font-size: 11px; padding: 1px 6px; }
+.slots { margin-bottom: 0; }
+.slot { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.slot .grow { flex: 1; min-width: 160px; }
+.hofstart { margin-top: 14px; max-width: 900px; }

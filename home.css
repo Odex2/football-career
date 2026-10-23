@@ -1,0 +1,90 @@
+/* Main screen and Profile tab (M8 phase I: js/ui-home.js, js/ui-profile.js) */
+
+/* career tab: block card and summary | cups | table on a computer; one column on a phone, in the spec's order */
+.grid.home { grid-template-columns: minmax(0, 1fr) 300px 340px; }
+.grid.home.nomid { grid-template-columns: minmax(0, 1fr) 340px; }
+@media (max-width: 1050px) {
+  .grid.home, .grid.home.nomid { grid-template-columns: minmax(0, 1fr); }
+  .home .c1, .home .c2 { display: contents; }
+  .home > .card { order: 6; }
+  .home .plan { order: 1; } .home .nextc { order: 2; } .home .sumc { order: 3; } .home .cupc { order: 4; } .home .euc { order: 5; }
+}
+
+/* the training line of the block card, leading to the Profile */
+.trainline { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; margin: 4px 0 10px; font-size: 13px; }
+.trainline:hover { border-color: var(--accent); }
+.trainline .go, .golink { color: var(--accent); font-weight: 700; }
+
+/* cup cards */
+.cupc, .euc { display: grid; gap: 8px; align-content: start; }
+.cupc h3, .euc h3 { margin: 0; }
+.cupc:hover, .euc:hover { border-color: var(--accent); }
+.cuphead { font-size: 14px; }
+.cuphead.win { color: var(--accent2); }
+.cupc.out, .euc.out { padding-top: 10px; padding-bottom: 10px; }
+.cupc.out .cuphead, .euc.out .cuphead { color: var(--muted); font-size: 13px; }
+.golink { font-size: 12px; }
+table.path td { padding: 3px 4px; font-size: 13px; }
+table.path td.up, table.path td.down { font-size: 13px; font-weight: 700; }
+.zp { display: inline-block; padding: 0 7px; border-radius: 6px; font-size: 12px; font-weight: 700; }
+.zp.ucl { background: #2e9be633; color: #8cc8f5; } .zp.up { background: #2ee6a622; color: var(--good); } .zp.down { background: #ff6b6b22; color: #ffb3b3; }
+
+/* profile: attributes with block and season change, peak age and weight in the role */
+.pa { display: grid; grid-template-columns: minmax(0, 1fr) 30px 40px 52px 36px; gap: 2px 6px; align-items: center; margin: 3px 0; font-size: 13px; }
+.pa.no0 { grid-template-columns: minmax(0, 1fr) 30px 40px 36px; }
+.pa > :not(:first-child) { text-align: right; }
+.pa small { display: block; font-size: 10.5px; line-height: 1.2; }
+.pa.key > span:first-child { color: var(--accent2); }
+.pa.hd { font-size: 10.5px; color: var(--muted); margin-top: 4px; }
+.prof .stack > * { min-width: 0; }
+.pa .bar { grid-column: 1 / -1; height: 4px; background: var(--panel2); border-radius: 2px; }
+.pa .bar i { display: block; height: 100%; border-radius: 2px; }
+.trait { margin-bottom: 4px; }
+table.cmp td, table.cmp th { padding: 4px 6px; font-size: 12.5px; white-space: nowrap; }
+.cmpbar { display: grid; grid-template-columns: minmax(0, 1fr) 30px; gap: 2px 8px; align-items: center; margin: 6px 0; font-size: 13px; }
+.cmpbar b { text-align: right; }
+.cmpbar .meter { grid-column: 1 / -1; }
+
+/* calendar (M8 phase J: js/ui-calendar.js): date | competition | home or away | opponent | result */
+.calf { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 8px; }
+.calf button { background: var(--panel2); color: var(--text); border: 1px solid var(--line); font-weight: 500; padding: 6px 11px; }
+.calf button.on { background: var(--accent); color: #062018; border-color: var(--accent); font-weight: 700; }
+.calm { border-top: 1px solid var(--line); padding: 6px 0; }
+.calm > summary { cursor: pointer; padding: 4px 0; font-size: 14px; }
+.calm.last { padding: 10px 0 2px; font-size: 14px; }
+.calr, .nxr { display: grid; grid-template-columns: 78px 22px 16px minmax(0, 1fr) 64px; gap: 2px 6px; align-items: center; padding: 5px 2px; font-size: 13px; border-radius: 6px; }
+.nxr { grid-template-columns: 74px 22px 16px minmax(0, 1fr); padding: 4px 0; }
+.calr .cd, .nxr .cd { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.calr .ci, .nxr .ci { text-align: center; }
+.calr .co small, .nxr .co small { display: block; font-size: 11px; line-height: 1.3; }
+.calr .ct, .nxr .ct { display: block; font-size: 11.5px; color: var(--accent2); line-height: 1.3; }
+.calr .cr { text-align: right; white-space: nowrap; }
+.calr .cr .muted { font-size: 11px; }
+.calr .cr small { display: block; font-size: 10px; color: var(--muted); font-weight: 400; }
+.calr.brk { color: var(--muted); }
+.calp > summary { list-style: none; cursor: pointer; }
+.calp > summary::-webkit-details-marker { display: none; }
+.calp > summary:hover, .calp[open] > summary { background: var(--panel2); }
+.calx { padding: 2px 8px 8px 126px; color: var(--muted); }
+.caltoday { margin: 4px 0; padding: 3px 8px; border-left: 3px solid var(--accent); background: #2ee6a614; color: var(--accent); font-size: 12px; font-weight: 700; letter-spacing: .04em; }
+.nextc { display: grid; gap: 4px; align-content: start; }
+.nextc h3 { margin: 0 0 2px; }
+.nextc:hover { border-color: var(--accent); }
+.behind { margin-left: 3px; color: var(--accent2); font-size: 11px; cursor: help; }
+button.skip { white-space: normal; text-align: left; }
+button.skip:disabled { opacity: .65; }
+@media (max-width: 600px) {
+  .calr { grid-template-columns: 62px 20px 14px minmax(0, 1fr) 50px; gap: 2px 4px; }
+  .calr .cr .muted { font-size: 10px; }
+  .calx { padding-left: 8px; }
+}
+
+/* the manager's bench before and after a match (M8 phase C: js/ui-mgr-live.js) */
+.prem .grow > div { margin-top: 2px; }
+.fml { display: inline-flex; gap: 2px; vertical-align: middle; }
+.fml b { display: inline-block; width: 17px; height: 17px; line-height: 17px; text-align: center; border-radius: 4px; font-size: 11px; color: #062018; }
+.fml .fmV { background: var(--good); } .fml .fmN { background: var(--mid); } .fml .fmP { background: var(--bad); color: #fff; }
+.lastm { border-top: 1px solid var(--line); margin-top: 10px; padding-top: 8px; }
+.rtl { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.rtc { background: var(--panel2); border-radius: 6px; padding: 2px 7px; font-size: 12px; }
+.rtc b { margin-left: 2px; }

@@ -1,0 +1,220 @@
+{
+ "player-att-ita": {
+  "year": 2044,
+  "age": 35,
+  "ovr": 85,
+  "apps": 869,
+  "goals": 547,
+  "trophies": 21,
+  "mgr": null,
+  "hash": "f7791143809ebf2b"
+ },
+ "player-por-eng": {
+  "year": 2044,
+  "age": 35,
+  "ovr": 76,
+  "apps": 591,
+  "goals": 0,
+  "trophies": 9,
+  "mgr": null,
+  "hash": "7c249086f7297ac6"
+ },
+ "player-cc-esp": {
+  "year": 2044,
+  "age": 35,
+  "ovr": 87,
+  "apps": 747,
+  "goals": 93,
+  "trophies": 22,
+  "mgr": null,
+  "hash": "c1d7c7b8a53a1c67"
+ },
+ "player-dc-ger": {
+  "year": 2044,
+  "age": 35,
+  "ovr": 69,
+  "apps": 464,
+  "goals": 20,
+  "trophies": 6,
+  "mgr": null,
+  "hash": "ba76924bafdae69b"
+ },
+ "player-es-fra": {
+  "year": 2042,
+  "age": 33,
+  "ovr": 78,
+  "apps": 599,
+  "goals": 139,
+  "trophies": 4,
+  "mgr": null,
+  "hash": "3634f61cef0c4ef6"
+ },
+ "manager-prov": {
+  "year": 2035,
+  "age": 47,
+  "ovr": 0,
+  "apps": 0,
+  "goals": 0,
+  "trophies": 0,
+  "mgr": {
+   "seasons": 9,
+   "jobs": 2,
+   "sacked": 1,
+   "rep": 47,
+   "trophies": 0
+  },
+  "hash": "c2c477209b35545f"
+ },
+ "manager-naz": {
+  "year": 2035,
+  "age": 51,
+  "ovr": 0,
+  "apps": 0,
+  "goals": 0,
+  "trophies": 0,
+  "mgr": {
+   "seasons": 9,
+   "jobs": 2,
+   "sacked": 1,
+   "rep": 55,
+   "trophies": 0
+  },
+  "hash": "6ca7e8386620c58b"
+ },
+ "manager-young": {
+  "year": 2035,
+  "age": 42,
+  "ovr": 0,
+  "apps": 0,
+  "goals": 0,
+  "trophies": 0,
+  "mgr": {
+   "seasons": 9,
+   "jobs": 2,
+   "sacked": 1,
+   "rep": 40,
+   "trophies": 0
+  },
+  "hash": "74fe78e8c454e805"
+ },
+ "player-then-manager": {
+  "year": 2048,
+  "age": 39,
+  "ovr": 86,
+  "apps": 809,
+  "goals": 55,
+  "trophies": 21,
+  "mgr": {
+   "seasons": 5,
+   "jobs": 2,
+   "sacked": 1,
+   "rep": 66,
+   "trophies": 0
+  },
+  "hash": "f42dd359f5501687"
+ },
+ "old-director-save": {
+  "year": 2045,
+  "age": 36,
+  "ovr": 85,
+  "apps": 590,
+  "goals": 74,
+  "trophies": 11,
+  "mgr": {
+   "seasons": 3,
+   "jobs": 1,
+   "sacked": 0,
+   "rep": 69,
+   "trophies": 2
+  },
+  "hash": "f779b1026cfed083"
+ },
+ "player-bra-random": {
+  "year": 2044,
+  "age": 35,
+  "ovr": 88,
+  "apps": 802,
+  "goals": 406,
+  "trophies": 24,
+  "mgr": null,
+  "hash": "421824540f64168b"
+ },
+ "player-ecu-loan": {
+  "year": 2044,
+  "age": 35,
+  "ovr": 68,
+  "apps": 451,
+  "goals": 31,
+  "trophies": 17,
+  "mgr": null,
+  "hash": "be3cd28efad7b937"
+ },
+ "player-ita-random": {
+  "year": 2044,
+  "age": 35,
+  "ovr": 79,
+  "apps": 594,
+  "goals": 34,
+  "trophies": 5,
+  "mgr": null,
+  "hash": "c6cbff6efe11b5ec"
+ },
+ "manager-arg-naz": {
+  "year": 2031,
+  "age": 46,
+  "ovr": 0,
+  "apps": 0,
+  "goals": 0,
+  "trophies": 0,
+  "mgr": {
+   "seasons": 5,
+   "jobs": 1,
+   "sacked": 1,
+   "rep": 48,
+   "trophies": 0
+  },
+  "hash": "b29adcd69196e02e"
+ },
+ "old-save-pre-m8": {
+  "year": 2030,
+  "age": 21,
+  "ovr": 72,
+  "apps": 113,
+  "goals": 20,
+  "trophies": 0,
+  "mgr": null,
+  "hash": "77918f26ce172fca"
+ },
+ "manager-live": {
+  "year": 2027,
+  "age": 40,
+  "ovr": 0,
+  "apps": 0,
+  "goals": 0,
+  "trophies": 0,
+  "mgr": {
+   "seasons": 1,
+   "jobs": 1,
+   "sacked": 0,
+   "rep": 47,
+   "trophies": 0
+  },
+  "hash": "98297a3ca4887e06"
+ },
+ "manager-fifa": {
+  "year": 2032,
+  "age": 47,
+  "ovr": 0,
+  "apps": 0,
+  "goals": 0,
+  "trophies": 0,
+  "mgr": {
+   "seasons": 6,
+   "jobs": 1,
+   "sacked": 0,
+   "rep": 45,
+   "trophies": 0
+  },
+  "hash": "6f59ce46a492b3e5"
+ }
+}
