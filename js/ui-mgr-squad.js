@@ -17,14 +17,14 @@ G.ui.reqText = function (r) { return r.k === 'spazio' ? 'chiede più spazio' : '
 // The bench: one line per request, to the Rosa tab
 /** @param {State} st @returns {string} */
 G.ui.mgrReqNotes = function (st) {
-  var m = st.mgr, W = st.world;
+  var m = G.mgr.job(st), W = st.world;
   return (m.req || []).map(function (r) { return '<div class="notice warn clickable" data-act="tab" data-v="squadra">😠 ' + W.players[r.id].n + ' ' + G.ui.reqText(r) + '</div>'; }).join('');
 };
 
 // The Rosa tab: the requests with their answers (and what the assistant answers if you do not)
 /** @param {State} st @returns {string} */
 G.ui.mgrReqs = function (st) {
-  var m = st.mgr, W = st.world, Q = G.CFG2.MGR_SQ, L = G.mgrSq.LABEL;
+  var m = G.mgr.job(st), W = st.world, Q = G.CFG2.MGR_SQ, L = G.mgrSq.LABEL;
   return (m.req || []).map(function (r) {
     var sr = m.sr[r.id], btn = /** @param {string} o @param {string} t */ function (o, t) { return '<button class="small ghost" data-act="mreq" data-v="' + r.id + ':' + o + '">' + t + '</button>'; };
     var opts = r.k === 'spazio' ? btn('promise', '🤝 Prometti più minuti · diventa ' + L[G.mgrSq.UP[sr]].toLowerCase()) + btn('talk', '💬 Spiega le tue scelte · ' + Math.round(G.mgrSq.talkP(m) * 100) + '%') + btn('list', '📋 Mettilo sul mercato') :
@@ -39,7 +39,7 @@ G.ui.mgrReqs = function (st) {
 // The lines of the player sheet on the Formazione tab: squad role, morale, form, injury
 /** @param {State} st @param {Npc} pl @returns {string} */
 G.ui.sqRows = function (st, pl) {
-  var m = st.mgr, id = pl.i, f = G.mgrSq.form(m, id), inj = G.mgrSq.inj(m, id);
+  var m = G.mgr.job(st), id = pl.i, f = G.mgrSq.form(m, id), inj = G.mgrSq.inj(m, id);
   return G.ui.pRow('Ruolo in rosa', (G.mgrSq.LABEL[m.sr && m.sr[id]] || '-') + (m.cap === id ? ' · ©' : '')) + G.ui.pRow('Morale', G.mgrSq.face(G.mgrSq.pm(m, id)) + ' ' + G.mgrSq.pm(m, id)) +
     G.ui.pRow('Forma', G.mgrSq.formSym(f) + ' ' + (f > 0 ? '+' : '') + f.toFixed(1)) + (inj ? G.ui.pRow('Infortunio', '🚑 fuori ' + inj + (inj === 1 ? ' partita' : ' partite')) : '');
 };
@@ -47,7 +47,7 @@ G.ui.sqRows = function (st, pl) {
 // The cells of a player, shared by the table and the phone list
 /** @param {State} st @param {Npc} pl @param {MatchRow} last @returns {Dict<string>} */
 G.ui.sqCells = function (st, pl, last) {
-  var m = st.mgr, id = pl.i, inj = G.mgrSq.inj(m, id), pm = G.mgrSq.pm(m, id), f = G.mgrSq.form(m, id), c = G.mgrTeam.cond(m, id), s = pl.s, T = G.CFG.MGR_TEAM, ren = G.mgrDeal.canRenew(st, pl), dev = m.dev && m.dev[id], near = G.mgrYouth.near(pl).length;
+  var m = G.mgr.job(st), id = pl.i, inj = G.mgrSq.inj(m, id), pm = G.mgrSq.pm(m, id), f = G.mgrSq.form(m, id), c = G.mgrTeam.cond(m, id), s = pl.s, T = G.CFG.MGR_TEAM, ren = G.mgrDeal.canRenew(st, pl), dev = m.dev && m.dev[id], near = G.mgrYouth.near(pl).length;
   var sel = '<select data-msr="' + id + '">' + G.mgrSq.ORDER.map(function (r) { return '<option value="' + r + '"' + (m.sr[id] === r ? ' selected' : '') + '>' + G.mgrSq.LABEL[r] + '</option>'; }).join('') + '</select>';
   var col = c >= T.COND_OK ? 'var(--good)' : c >= T.REST_AT ? 'var(--mid)' : 'var(--bad)';
   return {
@@ -74,7 +74,7 @@ G.ui.sqCells = function (st, pl, last) {
 
 /** @param {State} st @returns {string} */
 G.ui.mgrRosa = function (st) {
-  var m = st.mgr, W = st.world, S = st.S, club = W.clubs[m.club];
+  var m = G.mgr.job(st), W = st.world, S = G.sure(st.S), club = W.clubs[m.club];
   G.mgrSq.sync(st);
   var mine = /** @param {MatchRow} r */ function (r) { return !!r.mgr; };
   var last = S.blockRows.filter(mine).slice(-1)[0] || (S.rows || []).filter(mine).slice(-1)[0];

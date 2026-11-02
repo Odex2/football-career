@@ -7,7 +7,7 @@ G.mgrEv = {};
 
 /** @param {State} st @returns {MgrEvCtx} */
 G.mgrEv.ctx = function (st) {
-  var m = st.mgr, W = st.world, p = st.player, club = W.clubs[m.club], S = st.S, ids = G.season.sortTable(S, club.lg);
+  var m = G.mgr.job(st), W = st.world, p = st.player, club = W.clubs[m.club], S = G.sure(st.S), ids = G.season.sortTable(S, club.lg);
   var sq = club.sq.map(function (id) { return W.players[id]; }), star = sq.slice().sort(function (a, b) { return b.o - a.o; })[0];
   var kid = sq.filter(function (x) { return x.a <= 19; }).sort(function (a, b) { return b.p - a.p; })[0];
   var old = W.coaches.filter(function (c) { return !c.me && c.c >= 0 && c.c !== club.id && W.clubs[c.c].lg === club.lg && (p.rel[c.i] || 0) >= 15; })[0];
@@ -18,10 +18,10 @@ G.mgrEv.ctx = function (st) {
 
 /** @param {string} txt @param {MgrEvCtx} X */
 G.mgrEv.fill = function (txt, X) {
-  /** @type {Dict<any>} */
+  /** @type {Dict<string|number|undefined>} */
   var v = { club: X.club.name, star: X.star ? X.star.n : 'la stella', kid: X.kid ? X.kid.n : 'un ragazzo', old: X.old ? X.old.n : '', oldClub: X.old ? X.W.clubs[X.old.c].name : '',
     heir: X.heir ? X.heir.n : '', heirClub: X.heir && X.heir.c >= 0 ? X.W.clubs[X.heir.c].name : '', pos: X.pos };
-  return txt.replace(/\{(\w+)\}/g, function (m, k) { return v[k] !== undefined ? v[k] : m; });
+  return txt.replace(/\{(\w+)\}/g, function (m, k) { return v[k] !== undefined ? String(v[k]) : m; });
 };
 
 /** @type {MgrEventDef[]} */
@@ -67,33 +67,33 @@ G.mgrEv.cards = [
 
 /** @param {State} st */
 G.mgrEv.roll = function (st) {
-  if (st.event || !G.mgr.active(st) || st.S.block > 4 || !G.rng.chance(G.CFG.MGR_EV_CHANCE)) return;
+  if (st.event || !G.mgr.active(st) || G.sure(st.S).block > 4 || !G.rng.chance(G.CFG.MGR_EV_CHANCE)) return;
   var X = G.mgrEv.ctx(st), used = st.evUsed || (st.evUsed = {});
   var pool = G.mgrEv.cards.filter(function (c) {
-    if (used[c.id] && (c.once || used[c.id] === st.S.year)) return false;
+    if (used[c.id] && (c.once || used[c.id] === G.sure(st.S).year)) return false;
     try { return c.c(X); } catch (e) { return false; }
   });
   if (!pool.length) return;
   var card = pool[G.match.pickWeighted(pool.map(function (c) { return c.w; }), G.rng)];
-  used[card.id] = card.once ? 1 : st.S.year;
+  used[card.id] = card.once ? 1 : G.sure(st.S).year;
   st.event = { id: card.id, mgr: 1, t: G.mgrEv.fill(card.t, X), d: G.mgrEv.fill(card.d, X), o: card.o.map(function (o) { return G.mgrEv.fill(o[0], X); }) };
 };
 
 /** @param {State} st @param {number} idx */
 G.mgrEv.apply = function (st, idx) {
-  var ev = st.event, card = G.mgrEv.cards.filter(function (c) { return c.id === ev.id; })[0];
+  var ev = G.sure(st.event), card = G.mgrEv.cards.filter(function (c) { return c.id === ev.id; })[0];
   st.event = null;
   if (!card || !G.mgr.active(st)) return;
   var X = G.mgrEv.ctx(st), opt = card.o[idx] || card.o[0], fx = opt[1], txt = opt[2];
   G.mgrEv.effects(st, fx, X);
-  if (fx.p !== undefined) { var ok = G.rng.chance(fx.p); G.mgrEv.effects(st, ok ? fx.ok : fx.ko, X); txt = ok ? opt[2] : opt[3] || opt[2]; }
+  if (fx.p !== undefined) { var ok = G.rng.chance(fx.p); G.mgrEv.effects(st, G.sure(ok ? fx.ok : fx.ko), X); txt = ok ? opt[2] : opt[3] || opt[2]; }
   st.eventResult = { t: ev.t, r: G.mgrEv.fill(txt, X) };
   G.news(st, '🗒️ ' + ev.t + ': ' + st.eventResult.r);
 };
 
 /** @param {State} st @param {MgrFx} fx @param {MgrEvCtx} X */
 G.mgrEv.effects = function (st, fx, X) {
-  var m = st.mgr, W = st.world, club = X.club;
+  var m = G.mgr.job(st), W = st.world, club = X.club;
   if (fx.conf) m.conf = Math.round(G.clamp(m.conf + fx.conf, -10, 100));
   if (fx.mo) m.morale = Math.round(G.clamp(m.morale + fx.mo, 0, 100));
   if (fx.rep) { m.rep = G.clamp(m.rep + fx.rep, 40, 97); if (m.co >= 0) W.coaches[m.co].rep = m.rep; }
@@ -102,8 +102,8 @@ G.mgrEv.effects = function (st, fx, X) {
   if (fx.bud) club.bud = Math.round((club.bud + fx.bud) * 10) / 10;
   if (fx.young && X.kid) X.kid.o = Math.min(X.kid.p, X.kid.o + fx.young);
   if (fx.heir && X.heir) {
-    var from = W.clubs[X.heir.c];
-    if (from) from.sq = from.sq.filter(function (id) { return id !== X.heir.i; });
+    var heir = X.heir, from = W.clubs[heir.c];
+    if (from) from.sq = from.sq.filter(function (id) { return id !== heir.i; });
     X.heir.c = club.id; club.sq.push(X.heir.i); X.heir.y = 4;
     G.season.refresh(st);
   }

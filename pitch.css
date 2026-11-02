@@ -17,7 +17,7 @@
 .lines * { fill: none; stroke: rgba(232,238,248,.17); stroke-width: 1.4; vector-effect: non-scaling-stroke; }
 
 /* card */
-.pc { position: absolute; width: 17%; aspect-ratio: 5 / 6; transform: translate(-50%, -50%); border-radius: 10px; font: inherit; filter: none;
+.pc { position: absolute; width: 18%; aspect-ratio: 5 / 6; transform: translate(-50%, -50%); border-radius: 10px; font: inherit; filter: none;
   background: linear-gradient(180deg, #26385a, var(--panel2)); border: 1px solid #34496d; box-shadow: 0 4px 10px #0007;
   display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding: 0 3px 5px; color: var(--text); cursor: pointer; transition: transform .12s; }
 .pc:hover { filter: brightness(1.12); }
@@ -25,11 +25,11 @@
 .pc .shirt { position: absolute; top: 21%; left: 50%; transform: translateX(-50%); width: 46%; }
 .pc .tr { position: absolute; top: 3%; right: 6%; display: flex; align-items: center; gap: 4px; }
 .pc .ovr { font-weight: 800; font-size: clamp(12px, 3.3cqw, 20px); line-height: 1.1; text-shadow: 0 1px 2px #000a; }
-.pc .ovr.low { color: var(--orange); }
-.pc .dia { position: relative; width: clamp(7px, 1.9cqw, 12px); aspect-ratio: 1; transform: rotate(45deg); border-radius: 2px; background: #3a4b68; }
-.pc .dia.up { background: #1f9e6e; } .pc .dia.up2 { background: #2ee6a6; } .pc .dia.dn { background: #c0474a; }
-.pc .dia::after { content: ''; position: absolute; inset: 30%; border-left: 2px solid #fff; border-top: 2px solid #fff; }
-.pc .dia.dn::after { transform: rotate(180deg); } .pc .dia.eq::after { border-left: 0; transform: rotate(-45deg); }
+.pc .fa { font-size: clamp(7px, 1.9cqw, 11px); line-height: 1; color: #8fa0bd; letter-spacing: -1px; }
+.pc .fa.up { color: #1fbf85; } .pc .fa.up2 { color: #2ee6a6; } .pc .fa.dn { color: #ff6b6b; }
+.bench .pc .fa { font-size: 10px; }
+.pc .was { position: absolute; top: 17%; right: 7%; font-size: clamp(7px, 1.8cqw, 10px); color: var(--muted); font-weight: 700; }
+.pc.fg { border-color: #2ee6a699; } .pc.fy { border-color: var(--mid); } .pc.fo { border-color: var(--orange); } .pc.fr { border: 2px solid var(--bad); }
 .pc .tl { position: absolute; top: 5%; left: 7%; font-size: clamp(7.5px, 1.9cqw, 10px); font-weight: 800; color: var(--muted); letter-spacing: .2px; }
 .pc .tl .sub { color: var(--accent); }
 .pc .tl.me { color: var(--accent2); }
@@ -38,8 +38,8 @@
 .pc .bar { display: block; width: 74%; height: 4px; border-radius: 3px; background: #0008; overflow: hidden; margin-bottom: 3px; }
 .pc .bar i { display: block; height: 100%; background: var(--good); }
 .pc .bar i.mid { background: var(--mid); } .pc .bar i.bad { background: var(--bad); }
-.pc .name { display: block; width: 100%; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 800; text-transform: uppercase;
-  font-size: clamp(7.5px, 2.2cqw, 12.5px); letter-spacing: .1px; }
+.pc .name { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; width: 100%; text-align: center; overflow: hidden; overflow-wrap: anywhere; font-weight: 800; text-transform: uppercase;
+  font-size: clamp(7px, 2cqw, 12px); line-height: 1.08; letter-spacing: 0; }
 .pc .cap { display: inline-block; margin-right: 2px; background: #e8eef8; color: #0d1420; font-size: .8em; font-weight: 900; padding: 0 3px; border-radius: 2px; line-height: 1.25; }
 .pc.glow { background: radial-gradient(circle at 50% 38%, #cfe96a66, transparent 62%), linear-gradient(180deg, #2c4060, #1c2a44); border-color: #b9d65a; }
 .pc.me { border: 2px solid var(--accent2); }
@@ -50,18 +50,29 @@
 .pc .hint { position: absolute; top: 4%; left: 6%; font-size: clamp(9px, 2.4cqw, 12px); font-weight: 800; padding: 0 4px; border-radius: 6px; color: #0d1420; line-height: 1.35; box-shadow: 0 1px 4px #0008; }
 .hint.g, .legend b.g { background: var(--good); } .hint.y, .legend b.y { background: var(--mid); }
 .hint.o, .legend b.o { background: var(--orange); } .hint.r, .legend b.r { background: var(--bad); }
-.pitch.selecting .pc .dia { display: none; }
+.pitch.selecting .pc .fa { display: none; }
 .pitch.selecting .pc.hg { border-color: var(--good); } .pitch.selecting .pc.hy { border-color: var(--mid); }
 .pitch.selecting .pc.ho { border-color: var(--orange); } .pitch.selecting .pc.hr { border-color: #ff6b6b99; }
 
-/* bench */
-.bench { display: grid; grid-template-columns: repeat(auto-fill, minmax(74px, 1fr)); gap: 8px; container-type: inline-size; }
-@media (min-width: 900px) { .bench { grid-template-columns: repeat(auto-fill, minmax(98px, 1fr)); } }
-.bench .pc { position: relative; width: auto; transform: none; }
-.bench .pc.sel { transform: translateY(-3px); }
-.bench .pc .ovr { font-size: 16px; }
-.bench .pc .tl { font-size: 9.5px; }
-.bench .pc .name { font-size: 11.5px; }
+/* bench: compact cards, 5-6 a row on a computer, 2-3 on a phone (M9 S1) */
+.bench { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 6px; }
+.pb { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 6px; align-items: center; text-align: left; font: inherit; color: var(--text); cursor: pointer;
+  padding: 6px 8px 5px; border-radius: 9px; background: linear-gradient(180deg, #26385a, var(--panel2)); border: 1px solid #34496d; filter: none; }
+.pb:hover { filter: brightness(1.12); }
+.pb:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pb .rl { font-size: 10px; font-weight: 800; color: var(--muted); }
+.pb .rl .fa { font-size: 9px; }
+.pb .ov { font-weight: 800; font-size: 16px; line-height: 1; }
+.pb .nm { grid-column: 1 / -1; font-size: 11.5px; font-weight: 800; text-transform: uppercase; line-height: 1.15; overflow-wrap: anywhere; }
+.pb .cap { display: inline-block; margin-right: 2px; background: #e8eef8; color: #0d1420; font-size: .8em; font-weight: 900; padding: 0 3px; border-radius: 2px; }
+.pb .bar { grid-column: 1 / -1; display: block; height: 4px; border-radius: 3px; background: #0008; overflow: hidden; }
+.pb .bar i { display: block; height: 100%; background: var(--good); }
+.pb .bar i.mid { background: var(--mid); } .pb .bar i.bad { background: var(--bad); }
+.pb.first { border: 2px solid var(--accent); }
+.pb.sel { border: 2px solid var(--accent2); box-shadow: 0 0 0 3px #2ee6a640; }
+.pb.me { border: 2px solid var(--accent2); }
+.pb.inj { opacity: .7; }
+.pb .fa.up { color: #1fbf85; } .pb .fa.up2 { color: #2ee6a6; } .pb .fa.dn { color: #ff6b6b; }
 
 /* selected player: a bar under the pitch on a phone, a card aside on a computer */
 .selbar { position: sticky; bottom: 8px; z-index: 5; margin-top: 10px; display: flex; gap: 10px; align-items: center; background: var(--panel2); border: 1px solid var(--accent); border-radius: 12px; padding: 8px 10px; box-shadow: 0 6px 18px #000a; }
@@ -101,3 +112,58 @@ a.btn-like.small { text-decoration: none; padding: 5px 9px; font-size: 12px; dis
   .sqm .sqx select { align-self: flex-start; font-size: 13px; padding: 4px 6px; }
   .sqm .sqx button { align-self: flex-start; }
 }
+
+/* M9 S1: the formation bar, the panel of the selected player, the formations, the bench in rows (js/ui-pitch-edit.js) */
+.pebar { position: sticky; top: 0; z-index: 8; display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; background: var(--panel); padding: 6px 0; margin: -6px 0 2px; }
+.pebar .pstr { font-size: 13px; }
+.pebar .pstr b { font-size: 16px; }
+.pebar button[disabled] { opacity: .45; cursor: default; }
+.pswitch { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+.pswitch button { border-radius: 0; background: transparent; color: var(--muted); font-weight: 700; padding: 6px 10px; font-size: 13px; }
+.pswitch button.on { background: var(--accent); color: #062018; }
+.pmodeline { margin-bottom: 8px; }
+.plabel { font-size: 12px; color: var(--muted); }
+.plegend { margin-top: 8px; font-size: 12px; }
+.plegend summary { cursor: pointer; color: var(--muted); }
+.plegend .legend { margin-top: 6px; }
+.pforms { display: grid; gap: 6px; margin: 4px 0 10px; }
+.pfm { display: flex; gap: 10px; align-items: center; text-align: left; background: var(--panel2); color: var(--text); border: 1px solid var(--line); padding: 6px 10px; font-weight: 400; }
+.pfm.on { border-color: var(--accent); }
+.pfm svg { width: 34px; height: 38px; flex: none; background: #13283f; border-radius: 4px; }
+.pfm circle { fill: #e8eef8; }
+.pfm .chip { margin: 0; }
+.pflash { animation: pfade 8s forwards; }
+@keyframes pfade { 0%, 80% { opacity: 1; } 100% { opacity: .35; } }
+.bgrp + .bgrp { margin-top: 10px; }
+.bgt { font-size: 12px; color: var(--muted); margin-bottom: 4px; font-weight: 700; }
+.pepanel .opts { flex-wrap: wrap; gap: 6px; }
+.psubs { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.psubs button { text-align: left; }
+.pask p { margin: 0 0 8px; }
+.pask label { display: block; margin-bottom: 8px; }
+.ptrain > summary { cursor: pointer; font-weight: 700; }
+.ptrain .card { margin: 10px 0 0; border: 0; padding: 0; background: none; }
+@media (min-width: 901px) { .pside { position: sticky; top: 72px; } .card.phone { display: none; } }
+@media (max-width: 900px) {
+  .playout .pside.open { display: block; position: fixed; left: 8px; right: 8px; bottom: 8px; z-index: 30; max-height: 45vh; overflow: auto; margin: 0; border-color: var(--accent); box-shadow: 0 -6px 24px #000c; }
+  .pside .desk { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .pflash { animation: none; } }
+/* the compact header of the manager's tabs on a phone, and the formation bar under the fixed page header */
+@media (max-width: 700px) {
+  .hero.compact { gap: 6px 12px; padding: 10px 12px; }
+  .hero.compact .mini, .hero.compact .blocks, .hero.compact .ovr small { display: none; }
+  .hero.compact .ovr { font-size: 26px; }
+  .hero.compact h2 { font-size: 17px; }
+  .hero.compact > div > .muted, .hero.compact .idtc { display: none; }
+  .hero.compact > svg { width: 40px; height: 40px; }
+  .pebar { top: 80px; }
+}
+@media (min-width: 701px) { .pebar { top: 64px; } }
+/* 🧭 Panchine (M9 S2, js/ui-mgr-jobs.js): who follows the manager, one line each */
+.jfol { display: grid; grid-template-columns: minmax(0, 1fr) 90px 26px; gap: 8px; align-items: center; margin: 5px 0; }
+.jfol .meter { min-width: 0; }
+
+/* M9 S6: the tactic's levers on the formation tab (js/ui-mgr-tac.js) */
+.tlev { margin-top: 10px; }
+.tlev .seg { margin: 4px 0 2px; }

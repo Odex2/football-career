@@ -18,8 +18,10 @@ G.nationInfo = function (id) {
 /** @param {NationCode} nat @param {Rng} rng */
 G.squads.name = function (nat, rng) {
   var pool = G.DATA.names[nat] || G.DATA.names.ENG;
-  return rng.pick(pool[0].split(' ')) + ' ' + rng.pick(pool[1].split(' '));
+  return rng.pick(pool[0].split(' ')) + ' ' + rng.pick(pool[1].split(' ')).replace(/_/g, ' ');  // de_Jong: a surname of two words
 };
+/** @param {string} n a full name @returns {string} the surname: all after the first name ("de Jong", "El Khannouss") */
+G.squads.sur = function (n) { return n.slice(n.indexOf(' ') + 1); };
 
 /** @param {Club} club @param {Rng} rng @returns {NationCode} */
 G.squads.pickNat = function (club, rng) {
@@ -46,7 +48,7 @@ G.squads.wage = function (o, club) {
 
 /** @param {World} W @param {Npc} o */
 G.squads.newPlayer = function (W, o) {
-  var id = W.free && W.free.length ? W.free.pop() : W.players.length;
+  var id = W.free && W.free.length ? /** @type {PlayerId} */ (W.free.pop()) : W.players.length;
   o.i = id; o.s = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; o.k = o.k || [0, 0, 0];
   W.players[id] = o;
   return o;
@@ -111,7 +113,7 @@ G.squads.release = function (W, pl) {
 G.squads.retire = function (W, pl, rng) {
   if (pl.c >= 0) { var club = W.clubs[pl.c]; club.sq.splice(club.sq.indexOf(pl.i), 1); }
   if (pl.o >= 76 && rng.chance(0.35)) G.coaches.fromPlayer(W, pl, rng);
-  W.players[pl.i] = null;
+  W.players[pl.i] = /** @type {Npc} */ (/** @type {unknown} */ (null));  // a free slot, see World.players
   (W.free || (W.free = [])).push(pl.i);
 };
 
@@ -131,7 +133,7 @@ G.squads.yearEnd = function (W, rng, say, mgrClub) {
     pl.a++;
     pl.k[0] += pl.s[5]; pl.k[1] += pl.s[6]; pl.k[2] += pl.s[7];
     for (var j = 0; j < 10; j++) pl.s[j] = 0;
-    if (pl.a >= C.NPC_MAX_AGE || (pl.a >= C.NPC_RETIRE_AGE && rng.chance(0.4)) || pl.o < 40 || (pl.c < 0 && pl.fa >= 2)) {
+    if (pl.a >= C.NPC_MAX_AGE || (pl.a >= C.NPC_RETIRE_AGE && rng.chance(0.4)) || pl.o < 40 || (pl.c < 0 && (pl.fa || 0) >= 2)) {
       if (pl.o >= 85 && say) say('👋 ' + pl.n + ' si ritira dal calcio giocato');
       return G.squads.retire(W, pl, rng);
     }

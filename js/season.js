@@ -28,7 +28,7 @@ G.season.fixtures = function (S, key) {
       if (a >= 0 && b >= 0) md.push(r % 2 ? [b, a] : [a, b]);
     }
     rounds.push(md);
-    arr.splice(1, 0, arr.pop());
+    arr.splice(1, 0, /** @type {number} */ (arr.pop()));
   }
   var back = rounds.map(function (md) { return md.map(function (m) { return [m[1], m[0]]; }); });
   return (G.fixCache[ck] = rounds.concat(back));
@@ -38,7 +38,8 @@ G.season.fixtures = function (S, key) {
 G.season.start = function (st) {
   var W = st.world, rng = G.rng;
   G.fixCache = {};
-  var S = /** @type {Season} */ ({ year: st.year, block: 0, lg: {}, cups: {}, ps: G.season.emptyStats(), log: [], prize: {}, blockRows: [] });
+  // the start of the season, its stats and calendar come below
+  var S = /** @type {Season} */ (/** @type {unknown} */ ({ year: st.year, block: 0, lg: {}, cups: {}, ps: G.season.emptyStats(), log: [], prize: {}, blockRows: [] }));
   G.LEAGUES.forEach(function (L) {
     var ids = W.clubs.filter(function (c) { return c.lg === L.key; }).map(function (c) { return c.id; });
     /** @type {Dict<TableRow>} */
@@ -96,10 +97,10 @@ G.season.addResult = function (tab, h, a, res) {
 
 // The user's club: the player's, or the managed one (-1 when the manager has no club)
 /** @param {State} st @returns {ClubId} */
-G.season.myClub = function (st) { return st.mgr ? (G.mgr.active(st) ? st.mgr.club : -1) : st.player.clubId; };
+G.season.myClub = function (st) { return st.mgr ? (G.mgr.active(st) ? G.mgr.job(st).club : -1) : st.player.clubId; };
 // A tie of the user's club decided after a draw: the engine draws the winner, the match row says "ai rigori"
 /** @param {State} st @param {ClubId} h @param {ClubId} a */
-G.season.markPen = function (st, h, a) { var my = G.season.myClub(st), rows = st.S.blockRows; if ((h === my || a === my) && rows.length) rows[rows.length - 1].pen = 1; };
+G.season.markPen = function (st, h, a) { var my = G.season.myClub(st), rows = G.sure(st.S).blockRows; if ((h === my || a === my) && rows.length) rows[rows.length - 1].pen = 1; };
 // Name of a cup round from the clubs still in it (2 = final), as G.tour.ROUND
 /** @param {CupState} cup @returns {string} */
 G.season.cupRound = function (cup) { return G.tour.ROUND[cup.alive.length] || (cup.r + 1) + 'º turno'; };
@@ -109,7 +110,7 @@ G.season.cupRound = function (cup) { return G.tour.ROUND[cup.alive.length] || (c
 // known before the match: cup.ties holds [home, away, winner]; with an odd number of clubs the last one goes through
 /** @param {State} st @param {NationCode} nat */
 G.season.drawCup = function (st, nat) {
-  var cup = st.S.cups[nat], a = G.rng.shuffle(cup.alive), /** @type {number[][]} */ ties = [];
+  var cup = G.sure(st.S).cups[nat], a = G.rng.shuffle(cup.alive), /** @type {number[][]} */ ties = [];
   for (var i = 0; i + 1 < a.length; i += 2) ties.push([a[i], a[i + 1]]);
   if (a.length % 2) ties.push([a[a.length - 1], -1, a[a.length - 1]]);
   cup.ties = ties;
@@ -118,7 +119,7 @@ G.season.drawCup = function (st, nat) {
 // The ties of the round due on a date (a Tuesday round is split with the Wednesday); the last one ends the round
 /** @param {State} st @param {NationCode} nat @param {number} x */
 G.season.cupDay = function (st, nat, x) {
-  var S = st.S, W = st.world, rng = G.rng, cup = S.cups[nat], d = S.cal.cup[nat][cup.r];
+  var S = G.sure(st.S), W = st.world, rng = G.rng, cup = S.cups[nat], d = G.sure(S.cal).cup[nat][cup.r];
   if (cup.winner !== null || !cup.ties || d === undefined || x < d) return;
   var fin = cup.alive.length === 2, comp = { name: cup.name, lg: false, final: fin ? 1 : 0, ck: nat, rd: G.season.cupRound(cup) };
   var real = cup.ties.filter(function (t) { return t[1] >= 0; }).length;
@@ -135,8 +136,8 @@ G.season.cupDay = function (st, nat, x) {
 // The winners go on, the next round is drawn at once, and the league matches it clashes with move
 /** @param {State} st @param {NationCode} nat */
 G.season.endCupRound = function (st, nat) {
-  var cup = st.S.cups[nat];
-  cup.alive = cup.ties.map(function (t) { return t[2]; }); cup.r++;
+  var cup = G.sure(st.S).cups[nat];
+  cup.alive = G.sure(cup.ties).map(function (t) { return t[2]; }); cup.r++;
   if (st.mgr) G.mgrBoard.cupRound(st, cup);  // how far the manager's club got (M8 phase F)
   if (cup.alive.length === 1) { cup.winner = cup.alive[0]; return; }
   G.season.drawCup(st, nat);
@@ -174,7 +175,7 @@ G.season.cupRoundsFor = function (cup, b) {
 
 /** @param {State} st @returns {SeasonRecord} */
 G.season.end = function (st) {
-  var C = G.CFG, S = st.S, p = st.player, W = st.world, rng = G.rng;
+  var C = G.CFG, S = G.sure(st.S), p = st.player, W = st.world, rng = G.rng;
   var /** @type {Dict<ClubId[]>} */ tables = {}, /** @type {Dict<ClubId|null>} */ cupW = {};
   G.LEAGUES.forEach(function (L) { tables[L.key] = G.season.sortTable(S, L.key); });
   Object.keys(S.cups).forEach(function (k) { cupW[k] = S.cups[k].winner; });
@@ -200,6 +201,8 @@ G.season.end = function (st) {
     apps: ps.apps, matches: ps.matches, goals: ps.goals, assists: ps.assists, cs: ps.cs, avg: ps.rN ? Math.round(ps.rSum / ps.rN * 100) / 100 : 0,
     ovr: p.ovr, inj: ps.inj, lgG: ps.lg[1], lgA: ps.lg[2], trophies: won, loan: p.loanFrom !== null, awards: [] };
   if (!st.mgr) {
+    rec.posK = G.pos.of(p);  // the position played (M9 S5)
+    G.pos.seasonEnd(st);
     p.history.push(rec);
     rec.potUp = G.player.potUp(st, rec);
     won.forEach(function (t) { if (t !== 'Promozione') p.trophies.push({ name: t, year: S.year, club: club.name }); });

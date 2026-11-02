@@ -36,7 +36,7 @@ G.ui.pathTable = function (path) {
 // ---------- national cup ----------
 /** @param {State} st @param {ClubId} clubId @returns {string} */
 G.ui.cupCard = function (st, clubId) {
-  var S = st.S, W = st.world, club = W.clubs[clubId], nat = club.nat, cup = S.cups[nat];
+  var S = G.sure(st.S), W = st.world, club = W.clubs[clubId], nat = club.nat, cup = S.cups[nat];
   if (!cup) return '';
   // with a calendar the round is drawn in advance: the tie of the club, still to play or played while the round goes on
   var tie = cup.ties && cup.winner === null ? cup.ties.filter(function (t) { return t[0] === clubId || t[1] === clubId; })[0] : null;
@@ -50,9 +50,9 @@ G.ui.cupCard = function (st, clubId) {
   else if (alive && tie && tie[1] < 0) head = '<b>' + G.season.cupRound(cup) + '</b> · passi il turno senza giocare';
   else if (alive && tie && tie[2] === clubId) head = '<b>Turno superato</b> · il prossimo avversario si sorteggia a fine turno';
   else if (alive && tie) {
-    var real = cup.ties.filter(function (t) { return t[1] >= 0; }).length, fin = cup.alive.length === 2;
+    var real = G.sure(cup.ties).filter(function (t) { return t[1] >= 0; }).length, fin = cup.alive.length === 2, cal = G.sure(st.S).cal;
     head = '<b>' + G.season.cupRound(cup) + '</b> contro il ' + name(tie[0] === clubId ? tie[1] : tie[0]) + ' · ' + (fin ? 'campo neutro' : tie[0] === clubId ? 'in casa' : 'in trasferta') +
-      (st.S.cal ? ' · ' + G.cal.label(st.S.cal, G.cal.half(st.S.cal.cup[nat][cup.r], cup.ties.indexOf(tie), real, 1)) : '');
+      (cal ? ' · ' + G.cal.label(cal, G.cal.half(cal.cup[nat][cup.r], G.sure(cup.ties).indexOf(tie), real, 1)) : '');
   } else if (alive && cup.alive.length === 2) head = '<b>Finale</b> contro il ' + name(cup.alive[0] === clubId ? cup.alive[1] : cup.alive[0]) + ' · campo neutro';
   else if (alive) head = '<b>' + G.season.cupRound(cup) + '</b> · avversario da sorteggiare';
   else if (last && last.rd === 'Finale') head = 'Finale persa contro il ' + name(/** @type {ClubId} */ (last.opp)) + score;
@@ -64,7 +64,7 @@ G.ui.cupCard = function (st, clubId) {
 // ---------- European cup ----------
 /** @param {State} st @param {ClubId} clubId @returns {string} */
 G.ui.euroCard = function (st, clubId) {
-  var S = st.S, W = st.world, ks = S.eu ? G.europe.compsOf(st, clubId) : [];
+  var S = G.sure(st.S), W = st.world, ks = S.eu ? G.europe.compsOf(st, clubId) : [];
   if (!ks.length) return '';
   var k = ks[0], comp = S.eu[k], name = /** @param {ClubId} id */ function (id) { return W.clubs[id].name; }, head = '', body = '', out = false;
   var log = comp.log.filter(function (l) { return l.a === clubId || l.b === clubId; }).map(function (l) {

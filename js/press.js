@@ -9,7 +9,7 @@ G.press = {};
 // Rival club met in the coming block, if any
 /** @param {State} st @returns {Club|null} */
 G.press.derbyAhead = function (st) {
-  var S = st.S, club = st.world.clubs[st.player.clubId], lg = S.lg[club.lg], fx = G.season.fixtures(S, club.lg), cum = 0;
+  var S = G.sure(st.S), club = st.world.clubs[st.player.clubId], lg = S.lg[club.lg], fx = G.season.fixtures(S, club.lg), cum = 0;
   if (!club.riv.length || S.block > 4) return null;
   for (var i = 0; i <= S.block; i++) cum += G.CFG.BLOCK_SHARE[i];
   var T = Math.round(fx.length * Math.min(1, cum + 1e-9));
@@ -34,20 +34,20 @@ G.press.roll = function (st) {
   var card = pool[G.match.pickWeighted(w, G.rng)];
   if (!card) return;
   used[card.id] = st.year;
-  X.betN = card.n ? card.n(X) : 0;
-  var ns = card.o.map(function (o) { var b = o[1].bet; return b && b.n !== undefined ? (typeof b.n === 'function' ? b.n(X) : b.n) : X.betN; });
+  var bn = X.betN = card.n ? card.n(X) : 0;
+  var ns = card.o.map(function (o) { var b = G.sure(o[1]).bet; return b && b.n !== undefined ? (typeof b.n === 'function' ? b.n(X) : b.n) : bn; });
   st.event = { id: card.id, press: 1, betN: ns, t: G.events.fill(card.t, X), d: G.events.fill(card.d, X), o: card.o.map(function (o) { return G.events.fill(o[0], X); }) };
 };
 
 /** @param {State} st @param {PressBetDef} bet @param {number} n @param {string} label */
 G.press.bet = function (st, bet, n, label) {
-  st.bet = { k: bet.k, n: n, ok: bet.ok || {}, ko: bet.ko || {}, b: st.S.block, year: st.S.year, t: label };
+  st.bet = { k: bet.k, n: n, ok: bet.ok || {}, ko: bet.ko || {}, b: G.sure(st.S).block, year: G.sure(st.S).year, t: label };
 };
 
 // End of a block: was the promise kept?
 /** @param {State} st @param {BlockSum} sum */
 G.press.settle = function (st, sum) {
-  var B = st.bet, S = st.S;
+  var B = st.bet, S = G.sure(st.S);
   if (!B) return;
   if (B.year !== S.year || B.b !== sum.block) { if (B.year < S.year || B.b < sum.block) st.bet = null; return; }
   st.bet = null;

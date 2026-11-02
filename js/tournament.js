@@ -13,7 +13,7 @@ G.tour.create = function (st, key, teams) {
   for (var g = 0; g < ng; g++) groups.push([]);
   for (var pot = 0; pot < 4; pot++) rng.shuffle(sorted.slice(pot * ng, pot * ng + ng)).forEach(function (t, i) { groups[i].push(t); });
   teams.forEach(function (t) { tab[t] = [0, 0, 0, 0, 0, 0, 0]; });
-  return { key: key, n: D.n, year: st.S.year + 1, teams: teams, groups: groups, tab: tab, md: 0, stage: 'g', ko: [], log: [],
+  return { key: key, n: D.n, year: G.sure(st.S).year + 1, teams: teams, groups: groups, tab: tab, md: 0, stage: 'g', ko: [], log: [],
     winner: null, runner: null, sc: {}, scN: {}, my: { apps: 0, g: 0, a: 0 }, out: {} };
 };
 
@@ -89,9 +89,9 @@ G.tour.playDay = function (st, T) {
 // Tournament block (5), after the club season: call-up, then one matchday or round per day, plus a last day to celebrate
 /** @param {State} st */
 G.tour.beginBlock = function (st) {
-  var S = st.S, p = st.player, D = 1;
-  Object.keys(S.tours).forEach(function (k) {
-    var T = S.tours[k];
+  var S = G.sure(st.S), p = st.player, D = 1, tours = G.sure(S.tours);  // block 5 is played only when there are tournaments
+  Object.keys(tours).forEach(function (k) {
+    var T = tours[k];
     D = Math.max(D, G.tour.days(T) + 1);
     if (T.teams.indexOf(p.nat) >= 0) G.national.callUp(st, T.n + ' ' + T.year);
   });
@@ -101,15 +101,15 @@ G.tour.beginBlock = function (st) {
 
 /** @param {State} st @param {number} d */
 G.tour.day = function (st, d) {
-  var S = st.S;
-  Object.keys(S.tours).forEach(function (k) { if (d < G.tour.days(S.tours[k])) G.tour.playDay(st, S.tours[k]); });
+  var tours = G.sure(G.sure(st.S).tours);
+  Object.keys(tours).forEach(function (k) { if (d < G.tour.days(tours[k])) G.tour.playDay(st, tours[k]); });
 };
 
 // The tournament to show first: the player's nation's, else the World Cup or the first one
 /** @param {State} st */
 G.tour.mine = function (st) {
-  var S = st.S, keys = S && S.tours ? Object.keys(S.tours) : [];
-  return keys.filter(function (k) { return S.tours[k].teams.indexOf(st.player.nat) >= 0; })[0] || keys[0];
+  var S = st.S, tours = S && S.tours, keys = tours ? Object.keys(tours) : [];
+  return keys.filter(function (k) { return G.sure(tours)[k].teams.indexOf(st.player.nat) >= 0; })[0] || keys[0];
 };
 
 // Next opponent of nation id (null when out or done)
@@ -130,20 +130,21 @@ G.tour.nextOpp = function (T, id) {
 // End of season: roll of honour, trophies and awards for the player, Ballon d'Or bonus, ct review
 /** @param {State} st @param {SeasonRecord} rec */
 G.tour.seasonEnd = function (st, rec) {
-  var S = st.S, p = st.player, N = G.CFG.NT, rng = G.rng, /** @type {Dict<number>} */ bonus = S.ntBonus = {};
+  var S = G.sure(st.S), p = st.player, N = G.CFG.NT, rng = G.rng, /** @type {Dict<number>} */ bonus = S.ntBonus = {};
   /** @param {PlayerId|string} id @param {number} v */
   var add = function (id, v) { bonus[id] = (bonus[id] || 0) + v; };
-  if (!S.tours) return;
-  Object.keys(S.tours).forEach(function (k) {
-    var T = S.tours[k], D = N.TOURS[k], inIt = T.teams.indexOf(p.nat) >= 0, mine = inIt && T.my.apps > 0;
+  var tours = S.tours;
+  if (!tours) return;
+  Object.keys(tours).forEach(function (k) {
+    var T = G.sure(tours)[k], D = N.TOURS[k], win = G.sure(T.winner), run = G.sure(T.runner), inIt = T.teams.indexOf(p.nat) >= 0, mine = inIt && T.my.apps > 0;
     var best = Object.keys(T.sc).sort(function (a, b) { return T.sc[b] - T.sc[a]; })[0];
-    var bestName = best === undefined ? null : best === 'me' ? p.name : st.world.players[/** @type {any} */ (best)].n;
-    st.ntRoll.unshift({ year: T.year, key: k, n: T.n, winner: T.winner, runner: T.runner,
-      scorer: best !== undefined ? { n: bestName, nt: T.scN[best], g: T.sc[best], me: best === 'me' } : null, mine: inIt ? T.out[p.nat] : null });
-    G.national.xi(st, T.winner).forEach(function (id) { add(id, D.bdo); });
-    G.national.xi(st, T.runner).forEach(function (id) { add(id, D.bdo * N.FINALIST); });
+    var bestName = best === undefined ? null : best === 'me' ? p.name : st.world.players[+best].n;
+    st.ntRoll.unshift({ year: T.year, key: k, n: T.n, winner: win, runner: run,
+      scorer: best !== undefined ? { n: G.sure(bestName), nt: T.scN[best], g: T.sc[best], me: best === 'me' } : null, mine: inIt ? T.out[p.nat] : null });
+    G.national.xi(st, win).forEach(function (id) { add(id, D.bdo); });
+    G.national.xi(st, run).forEach(function (id) { add(id, D.bdo * N.FINALIST); });
     Object.keys(T.sc).forEach(function (id) { add(id, T.sc[id] * N.BDO_GOAL); });
-    G.news(st, '🌍 ' + T.n + ' ' + T.year + ': vince ' + G.national.name(T.winner) + (bestName ? ', capocannoniere ' + bestName + ' (' + T.sc[best] + ')' : ''));
+    G.news(st, '🌍 ' + T.n + ' ' + T.year + ': vince ' + G.national.name(win) + (bestName ? ', capocannoniere ' + bestName + ' (' + T.sc[best] + ')' : ''));
     if (!inIt && !D.q[G.NT[p.nat].conf]) return;
     if (mine) {
       if (T.winner === p.nat) { add('me', D.bdo); p.trophies.push({ name: T.n, year: S.year, club: G.nationInfo(p.nat).name }); rec.trophies.push(T.n); G.life.fame(st, k === 'WC' ? 15 : 8); }

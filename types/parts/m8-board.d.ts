@@ -4,7 +4,7 @@ type BoardState = 'ok' | 'mid' | 'ko';
 /** a goal of the board: category, text, importance, state now (run = it can still change); to = the round of the
  * cup (clubs left) or the European stage to reach, at = the smallest round of the cup the club played, c = the
  * European competition, lim = the wage bill allowed (M€), out = the -4 for an early exit already taken */
-interface BoardGoal { k: 'lg' | 'cup' | 'eu' | 'fin' | 'yth'; txt: string; imp: 'alta' | 'media' | 'bassa'; st: BoardState; run?: number; to?: number; at?: number; c?: string; lim?: number; out?: number }
+interface BoardGoal { k: 'lg' | 'cup' | 'eu' | 'fin' | 'yth' | 'idt'; txt: string; imp: 'alta' | 'media' | 'bassa'; st: BoardState; run?: number; to?: number; at?: number; c?: string; lim?: number; out?: number }
 /** what the assistant does by itself: renew contracts, deal on the market, look after the academy */
 interface Assistant { contracts: 0 | 1; market: 0 | 1; youth: 0 | 1 }
 /** games: the matches on the bench in the whole career */

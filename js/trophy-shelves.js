@@ -37,7 +37,7 @@ G.tro.promos = function (hist) {
 // The club the career is at now (or ended at): its league and cup are the "still to win" silhouettes
 /** @param {State} st @param {string} who @returns {Club|null} */
 G.tro.homeClub = function (st, who) {
-  var h = who === 'mg' ? st.mgr.hist : st.player.history, id = who === 'mg' ? st.mgr.club : st.player.clubId;
+  var h = who === 'mg' ? G.sure(st.mgr).hist : st.player.history, id = who === 'mg' ? G.sure(st.mgr).club : st.player.clubId;
   if (id === null || id === undefined) id = h.length ? h[h.length - 1].clubId : null;
   return id === null || id === undefined ? null : st.world.clubs[id];
 };
@@ -45,7 +45,7 @@ G.tro.homeClub = function (st, who) {
 /** @param {State} st @param {string} who @returns {Shelf[]} */
 G.tro.trophyShelves = function (st, who) {
   var p = st.player, m = st.mgr, club = G.tro.homeClub(st, who), nat = club ? club.nat : null;
-  var all = G.tro.group(who === 'mg' ? m.trophies.concat(G.tro.promos(m.hist)) : p.trophies.concat(G.tro.promos(p.history)));
+  var all = G.tro.group(who === 'mg' ? G.sure(m).trophies.concat(G.tro.promos(G.sure(m).hist)) : p.trophies.concat(G.tro.promos(p.history)));
   var top = G.LEAGUES.filter(function (L) { return L.nat === nat && L.tier === 1; })[0], cup = G.DATA.nations.filter(function (n) { return n.id === nat; })[0];
   var pick = /** @param {(k: string) => boolean} f */ function (f) { return all.filter(function (i) { return f(i.k); }); };
   var lg = pick(G.tro.isLeague), cups = pick(G.tro.isCup);
@@ -63,9 +63,9 @@ G.tro.trophyShelves = function (st, who) {
 };
 
 // Keepsakes per club, in the order the career went through them
-/** @param {CareerRow[]} rows @param {(r: any) => any} keep @returns {{ order: ClubId[], by: { [club: number]: any[] } }} */
+/** @template {CareerRow} R @param {R[]} rows @param {(r: R) => unknown} keep @returns {{ order: ClubId[], by: { [club: number]: R[] } }} */
 G.tro.byClub = function (rows, keep) {
-  var /** @type {ClubId[]} */ order = [], /** @type {{ [club: number]: any[] }} */ by = {};
+  var /** @type {ClubId[]} */ order = [], /** @type {{ [club: number]: R[] }} */ by = {};
   rows.forEach(function (r) {
     if (!keep(r)) return;
     if (!by[r.clubId]) { by[r.clubId] = []; order.push(r.clubId); }
@@ -97,7 +97,7 @@ G.tro.plAwards = function (st) {
 
 /** @param {State} st @returns {Shelf[]} */
 G.tro.mgrAwards = function (st) {
-  var m = st.mgr, W = st.world, all = G.tro.group(m.awards || []), /** @type {TroItem[]} */ mem = [];
+  var m = G.sure(st.mgr), W = st.world, all = G.tro.group(m.awards || []), /** @type {TroItem[]} */ mem = [];
   var isW = /** @param {string} n */ function (n) { return n === 'Allenatore dell’anno' || n === 'Dirigente dell’anno'; };
   var C = G.tro.byClub(m.hist, function () { return true; });
   if (m.club !== null && !C.by[m.club]) { C.order.push(m.club); C.by[m.club] = []; }

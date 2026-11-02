@@ -15,7 +15,10 @@ G.DATA.nations.forEach(function (n) {
   });
 });
 /** @param {LeagueKey} k @returns {LeagueInfo} */
-G.leagueByKey = function (k) { for (var i = 0; i < G.LEAGUES.length; i++) if (G.LEAGUES[i].key === k) return G.LEAGUES[i]; };
+G.leagueByKey = function (k) {
+  for (var i = 0; i < G.LEAGUES.length; i++) if (G.LEAGUES[i].key === k) return G.LEAGUES[i];
+  return /** @type {LeagueInfo} */ (/** @type {unknown} */ (undefined));  // only real keys are asked for
+};
 
 /** @param {string} name */
 G.shortName = function (name) {
@@ -29,13 +32,15 @@ G.shortName = function (name) {
 
 /** @param {Rng} rng @returns {World} */
 G.world.create = function (rng) {
-  var W = /** @type {World} */ ({ clubs: [], players: [], coaches: [], nextPid: 0, nextCid: 0 }), /** @type {Dict<Club>} */ byName = {};
+  // the agents come with G.game.newCareer
+  var W = /** @type {World} */ (/** @type {unknown} */ ({ clubs: [], players: [], coaches: [], nextPid: 0, nextCid: 0 })), /** @type {Dict<Club>} */ byName = {};
   G.DATA.nations.forEach(function (n) {
     n.leagues.forEach(function (l, i) {
       l.c.split(';').forEach(function (s) {
         var p = s.split(':');
-        var c = /** @type {Club} */ ({ id: W.clubs.length, name: p[0], nat: n.id, lg: n.id + (i + 1), base: +p[1], str: +p[1],
-          c1: '#' + p[2], c2: '#' + p[3], sty: p[4] || 's', riv: [], sq: [], coach: -1, hon: {} });
+        // reputation, short name, revenue and budget just below
+        var c = /** @type {Club} */ (/** @type {unknown} */ ({ id: W.clubs.length, name: p[0], nat: n.id, lg: n.id + (i + 1), base: +p[1], str: +p[1],
+          c1: '#' + p[2], c2: '#' + p[3], sty: p[4] || 's', riv: [], sq: [], coach: -1, hon: {} }));
         c.rep = Math.round(c.base + rng.range(-2, 2));
         c.short = G.shortName(c.name);
         W.clubs.push(c); byName[c.name] = c;

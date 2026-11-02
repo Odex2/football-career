@@ -1,6 +1,6 @@
 // Quick checks for the M8 features, run by tests/run.js right after the data check,
-// also with --quick. Each check takes the harness's load() and returns a list of problems (empty = fine);
-// a check that changes the game loads its own copy.
+// also with --quick (but for the simulated careers of tests/checks-careers.js, marked slow). Each check takes the
+// harness's load() and returns a list of problems (empty = fine); a check that changes the game loads its own copy.
 'use strict';
 
 // §1.1: the AI market never buys or sells for the managed club, even when it is club 0 (Liverpool)
@@ -72,7 +72,7 @@ function southAmerica(load) {
 
 // H9.1: 11 points per formation, in the order of the slots' roles, no two cards overlapping
 function pitchPos(load) {
-  const G = load(), out = [], W = 17, H = 17 * 1.2 / 1.12, GAP = 1, side = { TD: 'TS', ED: 'ES' };
+  const G = load(), out = [], W = 18, H = 18 * 1.2 / 1.12, GAP = 0.5, side = { TD: 'TS', ED: 'ES' };
   Object.keys(G.mgrTeam.FORMS).forEach(f => {
     const pos = G.ui.PITCH_POS[f], slots = G.mgrTeam.slots(f);
     if (!pos || pos.length !== 11) return out.push(f + ': ' + (pos ? pos.length : 'no') + ' points in PITCH_POS');
@@ -85,11 +85,12 @@ function pitchPos(load) {
   return out;
 }
 
-// H9.2 and H9.3: the manager's pitch has the XI and the bench, and two taps swap players
+// H9.2 and H9.3: the manager's pitch has the XI and the bench; since M9 S1 a tap selects, ↔️ Sposta and a tap on a
+// place move the player (a question first for the first manual change or a costly move)
 function pitchSwap(load) {
   const G = load(), out = [], st = G.game.newManager({ name: 'Test Manager', nat: 'ITA', bg: 'prov', age: 40, seed: 3 }), W = st.world;
   G.mgr.start(st, { club: W.clubs.find(c => c.name === 'Bologna').id, fans: 0, perks: null, bandiera: 0 });
-  const m = st.mgr, club = W.clubs[m.club], count = h => (h.match(/class="pc[ "]/g) || []).length;
+  const m = st.mgr, club = W.clubs[m.club], count = h => (h.match(/class="p[cb][ "]/g) || []).length;
   ['4-4-2', '3-4-3'].forEach(f => {
     G.mgrTeam.setForm(st, f);
     const o = G.ui.mgrPitchOpts(st), P = G.ui.pitch(o), xi = G.mgrTeam.xi(st);
@@ -98,16 +99,17 @@ function pitchSwap(load) {
     if (xi.some(x => P.bench.indexOf('b:' + x.id + '"') >= 0)) out.push(f + ': a starter is on the bench');
   });
   const tap = v => G.ui.pitchAct(st, 'mxsel', v), ids = () => G.mgrTeam.xi(st).map(x => x.id);
+  const yes = r => (G.ui.sel.ask ? G.ui.pitchAct(st, 'peok', '') : r), move = () => G.ui.pitchAct(st, 'pemode', 'move');
   G.ui.sel.mx = null;
   let xi = ids();
   // pitch - pitch: the two starters swap places
-  tap('s:9'); const r1 = tap('s:10'), after = ids();
+  tap('s:9'); move(); const r1 = yes(tap('s:10')), after = ids();
   if (r1 !== 'keep' || after[9] !== xi[10] || after[10] !== xi[9]) out.push('slot 9 and slot 10 did not swap');
   if (m.mode !== 'manual') out.push('a swap does not switch to the manual XI');
   // bench - pitch: the bench player comes in, the starter goes out
   xi = ids();
   const bench = club.sq.filter(id => xi.indexOf(id) < 0);
-  tap('b:' + bench[0]); tap('s:5');
+  tap('b:' + bench[0]); move(); yes(tap('s:5'));
   if (ids()[5] !== bench[0] || ids().indexOf(xi[5]) >= 0) out.push('the bench player did not come in for slot 5');
   // bench - bench changes the selection only; the same card again cancels
   tap('b:' + bench[1]); tap('b:' + bench[2]);
@@ -185,9 +187,9 @@ const CHECKS = [
   { t: 'M8 A3: odds of the random first club', f: startOdds },
   { t: 'M8 A: South American careers start abroad', f: southAmerica },
   { t: 'M8 H: pitch positions of every formation', f: pitchPos },
-  { t: 'M8 H: the pitch shows XI and bench, two taps swap players', f: pitchSwap },
+  { t: 'M8 H: the pitch shows XI and bench, a tap and ↔️ Sposta move players', f: pitchSwap },
   { t: 'M8 I: the season table moves to the Statistics, the Profile draws cleanly', f: profile },
   { t: 'M8 I: the cup cards in the cup, out, as winner; Europe only when qualified', f: cupCards }
-].concat(require('./checks-cal').CHECKS, require('./checks-mgr').CHECKS, require('./checks-deal').CHECKS, require('./checks-youth').CHECKS, require('./checks-board').CHECKS, require('./checks-extra').CHECKS);
+].concat(require('./checks-cal').CHECKS, require('./checks-mgr').CHECKS, require('./checks-deal').CHECKS, require('./checks-youth').CHECKS, require('./checks-board').CHECKS, require('./checks-extra').CHECKS, require('./checks-careers').CHECKS, require('./checks-m9').CHECKS, require('./checks-m9-id').CHECKS, require('./checks-m9-society').CHECKS, require('./checks-m9-pos').CHECKS, require('./checks-m9-tac').CHECKS);
 
 module.exports = { CHECKS };

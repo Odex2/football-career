@@ -28,7 +28,7 @@ G.transfers.sample = function (bucket, lo, hi, n, rng) {
 
 /** @param {World} W @param {Club} club @returns {MarketNeed|null} */
 G.transfers.need = function (W, club) {
-  var F = G.CFG.FORMATION, /** @type {MarketNeed} */ best = null;
+  var F = G.CFG.FORMATION, best = /** @type {MarketNeed|null} */ (null);
   G.ROLE_KEYS.forEach(function (r) {
     var list = G.squads.roleList(W, club, r), n = F[r];
     var weak = list[n - 1] !== undefined ? W.players[list[n - 1]].o : 40;
@@ -54,14 +54,14 @@ G.transfers.move = function (st, pl, club, fee, wage) {
 // AI window: w = 0 summer, 1 January
 /** @param {State} st @param {number} w */
 G.transfers.window = function (st, w) {
-  var C = G.CFG, W = st.world, rng = G.rng, /** @type {Dict<number>} */ buys = {}, ds = G.mgr.active(st) ? st.mgr.club : null;
+  var C = G.CFG, W = st.world, rng = G.rng, /** @type {Dict<number>} */ buys = {}, ds = G.mgr.active(st) ? G.mgr.job(st).club : null;
   for (var pass = 0; pass < C.MARKET_PASSES[w]; pass++) {
     var bk = G.transfers.buckets(W);
     rng.shuffle(W.clubs.slice()).forEach(function (club) {
       if ((buys[club.id] || 0) >= C.MAX_BUYS[w] || (ds !== null && club.id === ds)) return;
       var need = G.transfers.need(W, club);
       if (!need) return;
-      var bill = G.world.wageBill(W, club), cap = G.world.wageCap(club) * 1.05, /** @type {{ pl: Npc, fee: number, wage: number, score: number }} */ best = null;
+      var bill = G.world.wageBill(W, club), cap = G.world.wageCap(club) * 1.05, best = /** @type {{ pl: Npc, fee: number, wage: number, score: number }|null} */ (null);
       G.transfers.sample(bk[need.r], need.lo, need.hi, C.CAND_SAMPLE, rng).forEach(function (pl) {
         if (pl.c === club.id || pl.ln !== undefined) return;  // a player on loan stays where he is (M8 D5)
         var seller = pl.c >= 0 ? W.clubs[pl.c] : null;
@@ -96,7 +96,7 @@ G.transfers.window = function (st, w) {
 
 // ---------- main player ----------
 /** @param {Player} p */
-G.transfers.value = function (p) { return G.squads.value(p.ovr, p.age, Math.max(p.ovr, Math.round((p.pot + p.ovr) / 2))); };
+G.transfers.value = function (p) { return G.squads.value(p.ovr, p.age, Math.max(p.ovr, Math.round((p.pot + p.ovr) / 2))) * G.pos.valX(p); };  // the position counts (M9 S5)
 
 /** @param {State} st @param {Club} club @param {number} ovr */
 G.transfers.roleFor = function (st, club, ovr) {
@@ -108,24 +108,24 @@ G.transfers.roleFor = function (st, club, ovr) {
 /** @param {State} st @param {Club} club */
 G.transfers.wageFor = function (st, club) {
   var p = st.player, ag = G.life.agent(p);
-  return Math.round(G.squads.wage(p.ovr, club) * (1 + p.fame / 150) * G.rng.range(0.9, 1.12) * (ag ? 1 + ag.s * 0.03 : 1));
+  return Math.round(G.squads.wage(p.ovr, club) * G.pos.valX(p) * (1 + p.fame / 150) * G.rng.range(0.9, 1.12) * (ag ? 1 + ag.s * 0.03 : 1));
 };
 
 /** @param {State} st @param {Club} club @param {string} type @param {string} [note] @returns {Offer} */
 G.transfers.makeOffer = function (st, club, type, note) {
   var C = G.CFG, p = st.player, rng = G.rng, own = club.id === p.clubId;
   var contracted = p.contract && p.contract.years > 0;
-  var fee = type === 'transfer' && contracted ? Math.round(G.transfers.value(p) * (p.contract.years <= 1 ? 0.5 : 1) * 10) / 10 : 0;
+  var fee = type === 'transfer' && contracted ? Math.round(G.transfers.value(p) * (G.sure(p.contract).years <= 1 ? 0.5 : 1) * 10) / 10 : 0;
   /** @type {Offer} */
   var o = { id: (st.offerSeq = (st.offerSeq || 0) + 1), club: club.id, type: type, fee: fee, wage: G.transfers.wageFor(st, club),
     years: rng.int(C.CONTRACT_YEARS[0], Math.min(C.CONTRACT_YEARS[1], Math.max(2, 37 - p.age))), role: G.transfers.roleFor(st, club, p.ovr),
     rounds: 0, note: note || '' };
   if (own && type === 'renew') {
     // legend and captain premiums apply to the market wage, so renewals don't compound
-    o.wage = Math.round(Math.max(o.wage * (G.life.isBandiera(st, club.id) ? 1.2 : 1) * (p.captain === club.id ? C.CAPTAIN.RENEW : 1), p.contract.wage));
+    o.wage = Math.round(Math.max(o.wage * (G.life.isBandiera(st, club.id) ? 1.2 : 1) * (p.captain === club.id ? C.CAPTAIN.RENEW : 1), G.sure(p.contract).wage));
     if (G.life.isBandiera(st, club.id)) o.note = 'Rinnovo da bandiera';
   }
-  if (type === 'loan') { o.wage = p.contract.wage; o.years = 1; o.role = 'titolare'; }
+  if (type === 'loan') { o.wage = G.sure(p.contract).wage; o.years = 1; o.role = 'titolare'; }
   else { o.clause = G.contracts.clauseFor(st, club); o.bonus = G.contracts.bonusFor(o.wage); G.contracts.checkBid(st, o); }
   return o;
 };
@@ -231,7 +231,7 @@ G.transfers.accept = function (st, id) {
     p.contract = { years: o.years, wage: o.wage, role: o.role, clause: o.clause, bonus: o.bonus };
     G.news(st, '✍️ Rinnovi con il ' + to.name + ' fino al ' + (st.year + o.years));
   } else if (o.type === 'loan') {
-    p.loanFrom = from.id; p.clubId = to.id; p.contract.role = o.role;
+    p.loanFrom = from.id; p.clubId = to.id; G.sure(p.contract).role = o.role;
     G.news(st, '🔁 In prestito al ' + to.name);
   } else {
     if (o.fee) { from.bud += o.fee; to.bud -= o.fee; }

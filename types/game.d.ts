@@ -39,7 +39,7 @@ interface Rng {
 
 // ---- Static data (built at load from js/names.js, js/world.js, js/config.js)
 interface LeagueInfo { key: LeagueKey; nat: NationCode; tier: number; name: string; size: number }
-interface NationInfo { id: NationCode; name: string; flag: string; cup: string; eu: number; leagues: { n: string; c: string }[]; [k: string]: any }
+interface NationInfo { id: NationCode; name: string; flag: string; cup: string; eu: number; leagues: { n: string; c: string }[] }
 interface RoleInfo { label: string; name: string; macro: string }
 
 // ---- The world
@@ -70,8 +70,8 @@ interface Club {
   /** honours: trophy name -> times won */
   hon: { [trophy: string]: number };
   /** revenue and transfer budget, M€ */
-  rev?: number;
-  bud?: number;
+  rev: number;
+  bud: number;
 }
 
 /** NPC footballer, short keys to keep saves small */
@@ -114,7 +114,11 @@ interface World {
 }
 
 // ---- The main player
-interface Contract { years: number; wage: number; role: string; clause?: number; bonus?: { g: number; a: number; t: number } }
+interface Contract { years: number; wage: number; role: string; clause?: number; bonus?: ContractBonus }
+/** bonuses in k€ per goal, appearance, trophy */
+interface ContractBonus { g: number; a: number; t: number }
+/** a contract after G.contracts.ensure: it always has its clause and bonuses */
+interface FullContract extends Contract { clause: number; bonus: ContractBonus }
 
 interface SeasonGoal { k: string; n: number; lvl: number; t: string; base?: number }
 
@@ -246,13 +250,14 @@ interface Tournament {
   md: number;
   stage: string;
   ko: NationCode[][];
-  log: { stage: string; a: NationCode; b: NationCode; ga: number; gb: number; w: NationCode; pens?: any }[];
+  log: { stage: string; a: NationCode; b: NationCode; ga: number; gb: number; w: NationCode; pens?: boolean }[];
   winner: NationCode | null;
   runner: NationCode | null;
   sc: { [k: string]: number };
   scN: { [k: string]: string };
   my: { apps: number; g: number; a: number };
-  out: { [nat: string]: any };
+  /** how far each nation went: 'Fase a gironi', a round, 'Finale', 'Campione' */
+  out: { [nat: string]: string };
 }
 
 /** The player's numbers in the current season */
@@ -317,7 +322,8 @@ interface Season {
   cups: { [nat: string]: CupState };
   eu: { [key: string]: EuroComp };
   ps: SeasonStats;
-  log: any[];
+  /** never written: saves keep it empty */
+  log: never[];
   prize: { [k: number]: number };
   blockRows: MatchRow[];
   start0: { ovr: number; fame: number; money: number };
@@ -365,6 +371,8 @@ interface NewsItem { y: number; b: number; t: string }
 
 // ---- Manager career (js/mgr*.js)
 interface MgrPerks { pat: number; bud: number; mor: number }
+/** the board's target for the season: league position tgt out of n (G.mgr.objective) */
+interface MgrObjective { year: number; tgt: number; n: number; txt: string }
 interface MgrOffer { club: ClubId; fans: number; perks: MgrPerks | null; bandiera: number }
 interface MgrSeason { year: number; age: number; club: string; clubId: ClubId; role: string; lg: string; pos: number | null; tgt: number | null; won: string[]; note: string }
 interface XiSlot { r: RoleKey; id: PlayerId }
@@ -391,7 +399,7 @@ interface Mgr {
   pat?: number;
   perks?: MgrPerks;
   morale?: number;
-  obj?: { year: number; tgt: number; n: number; txt: string };
+  obj?: MgrObjective;
   pos?: number;
   tactic: string;
   form: string;
@@ -417,6 +425,11 @@ interface Mgr {
   policy?: string;
 }
 
+/** st.flags: the coach who just arrived, the rival just signed, and the marks of answers that have follow-up cards */
+interface CareerFlags { newCoach?: CoachId; newRival?: string; [mark: string]: FlagMark | CoachId | string | undefined }
+/** an answer remembered for a follow-up card (js/events-data3.js): the year and the club where it happened */
+interface FlagMark { y: number; club: ClubId }
+
 // ---- The whole career: what the save holds
 interface State {
   v: number;
@@ -431,7 +444,7 @@ interface State {
   news: NewsItem[];
   roll: AwardRoll[];
   ntRoll: NtRollEntry[];
-  flags: { [k: string]: any };
+  flags: CareerFlags;
   offers: Offer[];
   offerSeq?: number;
   noOffers?: boolean;
@@ -440,7 +453,7 @@ interface State {
   coachCalls?: { coach: CoachId; club: ClubId }[];
   event?: EventCard | null;
   eventResult?: { t: string; r: string } | null;
-  pressResult?: any;
+  pressResult?: { ok: boolean; t: string } | null;
   evUsed?: { [id: string]: number };
   goalOffer?: SeasonGoal[] | null;
   goal?: SeasonGoal | null;
@@ -449,13 +462,14 @@ interface State {
   momentResult?: { ok: boolean; t: string } | null;
   momSeen?: string[];
   live?: boolean;
-  recap?: any;
+  recap?: PlayerRecap | MgrRecap | null;
   lastBlock?: BlockSum;
   lastTables?: { key: LeagueKey; ids: ClubId[]; tab: Dict<TableRow> };
   records?: Records;
   prevAttrs?: Attrs;
   achNew?: string[];
-  ntq?: any;
+  /** qualifiers of the next tournament: points pts in n matches */
+  ntq?: { key: string; year: number; pts: number; n: number } | null;
   hofSaved?: boolean;
   hofId?: string;
   rngState?: number;

@@ -24,7 +24,7 @@ type EventOpt = [string, EventFx?, string?, string?];
 interface EventDef {
   id: string;
   w?: number | ((X: EvCtx) => number);
-  c: (X: EvCtx) => any;
+  c: (X: EvCtx) => unknown;
   t: string;
   d: string;
   o: EventOpt[];
@@ -53,11 +53,11 @@ interface EvCtx {
   /** the last block played (an empty object before the first one) */
   last: BlockSum;
   minShare: number; avg: number; goalsS: number; appsS: number; pos: number; n: number; tier: number; big: boolean;
-  euro: string[]; riv: Club | null; loan: boolean; flags: Dict<any>; seasons: number; atClub: number;
+  euro: string[]; riv: Club | null; loan: boolean; flags: CareerFlags; seasons: number; atClub: number;
   abroad: boolean; att: boolean; def: boolean;
   lgG: number; lgA: number; lgApps: number; lastApps: number; lastG: number; lastMatches: number; minPct: number;
   /** the last n matches played all satisfy f */
-  recent: (n: number, f: (r: MatchRow) => any) => boolean;
+  recent: (n: number, f: (r: MatchRow) => unknown) => boolean;
   dry: number; scorerRank: number; leaderG: number; bdoRank: number; teamBest: number;
   cupAlive: boolean; euAlive: boolean; ptsGap: number;
   /** set by some conditions and by the press room */
@@ -77,7 +77,7 @@ interface Player {
 interface MgrFx { conf?: number; mo?: number; rep?: number; fn?: number; $?: number; bud?: number; young?: number; heir?: number; p?: number; ok?: MgrFx; ko?: MgrFx }
 
 /** A manager card (G.mgrEv.cards): [label, effects, result text, result text when p fails] per option */
-interface MgrEventDef { id: string; w: number; once?: number; c: (X: MgrEvCtx) => any; t: string; d: string; o: [string, MgrFx, string, string?][] }
+interface MgrEventDef { id: string; w: number; once?: number; c: (X: MgrEvCtx) => unknown; t: string; d: string; o: [string, MgrFx, string, string?][] }
 
 /** What manager cards see (G.mgrEv.ctx) */
 interface MgrEvCtx {

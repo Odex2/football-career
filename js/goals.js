@@ -17,10 +17,11 @@ G.goals.make = function (st) {
   var stN = Math.min(C.STARTER, Math.round((ch + 0.25) * 20) / 20);
   if (ch < C.STARTER) add('starter', stN, 2, 'Conquista il posto: titolare in almeno il ' + Math.round(stN * 100) + '% delle partite');
   else add('avg', ch > 0.75 ? C.AVG[1] : C.AVG[0], ch > 0.75 ? 2 : 1, 'Chiudi la stagione con un voto medio di almeno ' + String(ch > 0.75 ? C.AVG[1] : C.AVG[0]).replace('.', ','));
-  if (macro === 'ATT' || p.role === 'ES' || p.role === 'CC') {
+  var pg = G.CFG2.POS.GOAL[G.pos.of(p)];  // goals or assists by position (M9 S5): the 6 roles of before as they were
+  if (pg) {
     // a stretch on what you did here last season (+10%, at most +C.STRETCH), otherwise on your expected minutes
-    var cc = p.role === 'CC', prev = cc ? lastA : lastG, norm = ch * (cc ? 6 : p.role === 'ATT' ? 14 : 7);
-    var exp = Math.max(p.role === 'ATT' ? 6 : 3, same ? Math.min(prev + C.STRETCH, Math.round(prev * 1.1 + 0.5)) : Math.round(norm * 1.15));  // 0 last season is a number too
+    var cc = pg[0] === 'assists', prev = cc ? lastA : lastG, norm = ch * pg[1];
+    var exp = Math.max(pg[2], same ? Math.min(prev + C.STRETCH, Math.round(prev * 1.1 + 0.5)) : Math.round(norm * 1.15));  // 0 last season is a number too
     add(cc ? 'assists' : 'goals', exp, 2, 'Almeno ' + exp + (cc ? ' assist' : ' gol') + ' in campionato');
   } else if (p.role === 'POR') add('cs', Math.max(3, Math.round(ch * C.CS)), 1, 'Almeno ' + Math.max(3, Math.round(ch * C.CS)) + ' partite senza subire gol');
   else add('apps', Math.max(8, Math.round(ch * C.APPS)), 1, 'Almeno ' + Math.max(8, Math.round(ch * C.APPS)) + ' presenze in campionato');
@@ -38,23 +39,24 @@ G.goals.offer = function (st) {
   st.goalOffer = G.goals.make(st); st.goal = null; st.goalYear = st.S.year;
 };
 
-/** @param {State} st @param {number} i */
+/** @param {State} st @param {number} i @returns {SeasonGoal|undefined} the goal taken */
 G.goals.pick = function (st, i) {
   var g = st.goalOffer && st.goalOffer[i];
   if (!g) return;
   st.goal = g; g.base = st.player.derbyWins || 0; st.goalOffer = null;
+  return g;
 };
 
 // Nobody chose by the end of the first block: the first goal is taken
 /** @param {State} st */
 G.goals.ensure = function (st) {
-  if (st.goalOffer && !st.goal) { G.goals.pick(st, 0); G.news(st, '🎯 Obiettivo della stagione: ' + st.goal.t); }
+  if (st.goalOffer && !st.goal) { var g = G.goals.pick(st, 0); G.news(st, '🎯 Obiettivo della stagione: ' + G.sure(g).t); }
 };
 
 // Where the goal stands now: { v: value, ok: reached }
 /** @param {State} st @param {SeasonGoal} g @returns {{ v: number, ok: boolean, low: boolean }} */
 G.goals.progress = function (st, g) {
-  var S = st.S, ps = S.ps, p = st.player, club = st.world.clubs[p.clubId], pos = G.season.sortTable(S, club.lg).indexOf(club.id) + 1, v;
+  var S = G.sure(st.S), ps = S.ps, p = st.player, club = st.world.clubs[p.clubId], pos = G.season.sortTable(S, club.lg).indexOf(club.id) + 1, v;
   if (g.k === 'goals') v = ps.lg[1];
   else if (g.k === 'apps') v = ps.lg[0];
   else if (g.k === 'assists') v = ps.lg[2];

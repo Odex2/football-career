@@ -52,12 +52,12 @@ G.europe.draw = function (W, ids, mds, rng) {
   var /** @type {Dict<number>} */ met = {}, /** @type {Dict<number>} */ homes = {}, /** @type {number[][][]} */ fx = [];
   ids.forEach(function (id) { homes[id] = 0; });
   for (var m = 0; m < mds; m++) {
-    /** @type {{ pairs: number[][], bad: number }} */
+    /** @type {{ pairs: number[][], bad: number }|null} */
     var best = null;
     for (var tryN = 0; tryN < 60; tryN++) {
       var pool = rng.shuffle(ids.slice()), /** @type {number[][]} */ pairs = [], bad = 0;
       while (pool.length) {
-        var x = pool.shift(), j = 0;
+        var x = /** @type {number} */ (pool.shift()), j = 0;
         while (j < pool.length && (met[x + '-' + pool[j]] || W.clubs[x].nat === W.clubs[pool[j]].nat)) j++;
         if (j === pool.length) { j = 0; bad++; }
         pairs.push([x, pool.splice(j, 1)[0]]);
@@ -65,7 +65,7 @@ G.europe.draw = function (W, ids, mds, rng) {
       if (!best || bad < best.bad) best = { pairs: pairs, bad: bad };
       if (!bad) break;
     }
-    fx.push(best.pairs.map(function (pr) {
+    fx.push(G.sure(best).pairs.map(function (pr) {
       met[pr[0] + '-' + pr[1]] = met[pr[1] + '-' + pr[0]] = 1;
       var h = homes[pr[0]] <= homes[pr[1]] ? pr[0] : pr[1], a = h === pr[0] ? pr[1] : pr[0];
       homes[h]++;
@@ -86,7 +86,7 @@ G.europe.sortTable = function (comp) {
 
 /** @param {State} st @param {string} k @param {ClubId} id @param {number} share */
 G.europe.prize = function (st, k, id, share) {
-  var S = st.S;
+  var S = G.sure(st.S);
   S.prize[id] = (S.prize[id] || 0) + G.CFG.PRIZE[G.CFG.UEFA[k].prize] * share;
 };
 
@@ -128,7 +128,7 @@ G.europe.playKo = function (st, comp) {
 // ---------- with a calendar (M8 phase J): each match at its date, the two legs of a tie on two dates ----------
 /** @param {State} st */
 G.europe.blockPrize = function (st) {
-  G.EU_KEYS.forEach(function (k) { var comp = st.S.eu[k]; if (comp.md === 0) comp.teams.forEach(function (id) { G.europe.prize(st, k, id, 0.4); }); });
+  G.EU_KEYS.forEach(function (k) { var comp = G.sure(st.S).eu[k]; if (comp.md === 0) comp.teams.forEach(function (id) { G.europe.prize(st, k, id, 0.4); }); });
 };
 
 // The league-phase matches of a date (Champions League: half on Tuesday, half on Wednesday), or one leg of each tie.
@@ -136,7 +136,7 @@ G.europe.blockPrize = function (st) {
 /** @param {State} st @param {number} x */
 G.europe.playDate = function (st, x) {
   G.EU_KEYS.forEach(function (k) {
-    var comp = st.S.eu[k], c = st.S.cal.eu[k];
+    var S = G.sure(st.S), comp = S.eu[k], c = G.sure(S.cal).eu[k];
     if (comp.stage === 'lp') {
       var md = comp.md, ms = comp.fx[md], d = c.lp[md];
       if (!ms || x < d) return;
@@ -205,7 +205,7 @@ G.europe.nextStage = function (st, comp) {
 G.europe.beginBlock = function (st, cur) {
   var b = cur.b;
   G.EU_KEYS.forEach(function (k) {
-    var comp = st.S.eu[k], mds = comp.fx.length;
+    var comp = G.sure(st.S).eu[k], mds = comp.fx.length;
     cur.eu[k] = [comp.md, b === 0 ? 0 : b === 1 ? Math.ceil(mds * 0.6) : mds, 0];
     if (b === 1 && comp.md === 0) comp.teams.forEach(function (id) { G.europe.prize(st, k, id, 0.4); });
   });
@@ -215,7 +215,7 @@ G.europe.beginBlock = function (st, cur) {
 G.europe.playDay = function (st, cur, d, D) {
   var b = cur.b, f = (d + 1) / D;
   G.EU_KEYS.forEach(function (k) {
-    var comp = st.S.eu[k], r = cur.eu[k], target = Math.round(r[0] + (r[1] - r[0]) * f);
+    var comp = G.sure(st.S).eu[k], r = cur.eu[k], target = Math.round(r[0] + (r[1] - r[0]) * f);
     for (; comp.md < target; comp.md++) {
       comp.fx[comp.md].forEach(function (m) {
         var res = G.match.play(st, m[0], m[1], { name: comp.name, lg: false, ck: k, rd: 'Fase campionato' });
@@ -233,5 +233,5 @@ G.europe.playDay = function (st, cur, d, D) {
 
 /** @param {State} st @param {ClubId} id */
 G.europe.compsOf = function (st, id) {
-  return G.EU_KEYS.filter(function (k) { return st.S.eu[k].teams.indexOf(id) >= 0; });
+  return G.EU_KEYS.filter(function (k) { return G.sure(st.S).eu[k].teams.indexOf(id) >= 0; });
 };

@@ -29,7 +29,7 @@ G.cal.blockOf = function (cal, d) { for (var b = 0; b < cal.bl.length; b++) if (
 // The last day already played: everything after it is still to play
 /** @param {State} st @returns {number} */
 G.cal.now = function (st) {
-  var S = st.S, cal = S.cal, b = S.cur ? S.cur.b : S.block;
+  var S = G.sure(st.S), cal = G.sure(S.cal), b = S.cur ? S.cur.b : S.block;
   return Math.max(S.today === undefined ? -1 : S.today, b <= 4 ? cal.bl[b][0] - 1 : cal.bl[4][1]);
 };
 
@@ -51,7 +51,7 @@ G.cal.spread = function (list, k) { var out = []; for (var i = 0; i < k && list.
 // ---------- building the season (J1, J2) ----------
 /** @param {State} st @returns {SeasonCal} */
 G.cal.build = function (st) {
-  var S = st.S, Y = S.year, C = G.CFG, DAY = G.cal.DAY, CAL = G.CFG2.CAL, a13 = Date.UTC(Y, 7, 13), ms0 = a13 + ((6 - new Date(a13).getUTCDay() + 7) % 7) * DAY;
+  var S = G.sure(st.S), Y = S.year, C = G.CFG, DAY = G.cal.DAY, CAL = G.CFG2.CAL, a13 = Date.UTC(Y, 7, 13), ms0 = a13 + ((6 - new Date(a13).getUTCDay() + 7) % 7) * DAY;
   var off = /** @param {number} y @param {number} m @param {number} d */ function (y, m, d) { return Math.round((Date.UTC(y, m, d) - ms0) / DAY); };
   var may31 = off(Y + 1, 4, 31), L = may31 - (G.cal.dow(may31) + 2) % 7;  // L: the last Saturday of May
   var nov1 = off(Y, 10, 1), mar31 = off(Y + 1, 2, 31);
@@ -114,19 +114,19 @@ G.cal.build = function (st) {
 // ---------- league dates ----------
 /** @param {Season} S @param {LeagueKey} key @param {number} md @param {number} i @returns {number} the date before any move */
 G.cal.base = function (S, key, md, i) {
-  var d = S.cal.lg[key][md];
+  var d = G.sure(S.cal).lg[key][md];
   return G.cal.dow(d) === 5 && i >= Math.ceil(G.season.fixtures(S, key)[md].length / 2) ? d + 1 : d;
 };
 /** @param {Season} S @param {LeagueKey} key @param {number} md @param {number} i @returns {number} */
 G.cal.when = function (S, key, md, i) {
-  var mv = S.cal.mv[key], k = md + ':' + G.season.fixtures(S, key)[md][i][0];
+  var mv = G.sure(S.cal).mv[key], k = md + ':' + G.season.fixtures(S, key)[md][i][0];
   return mv && mv[k] !== undefined ? mv[k] : G.cal.base(S, key, md, i);
 };
 
 // The dates of a block on which something is played, in order
 /** @param {State} st @param {number} b @returns {number[]} */
 G.cal.days = function (st, b) {
-  var S = st.S, cal = S.cal, lo = cal.bl[b][0], hi = cal.bl[b][1], /** @type {Dict<number>} */ set = {};
+  var S = G.sure(st.S), cal = G.sure(S.cal), lo = cal.bl[b][0], hi = cal.bl[b][1], /** @type {Dict<number>} */ set = {};
   var add = /** @param {number} d @param {boolean} [two] */ function (d, two) { if (d >= lo && d <= hi) set[d] = 1; if (two && d + 1 >= lo && d + 1 <= hi) set[d + 1] = 1; };
   G.LEAGUES.forEach(function (L) {
     cal.lg[L.key].forEach(function (d) { add(d, G.cal.dow(d) === 5); });
@@ -152,7 +152,7 @@ G.cal.koDates = function (comp, c) { return comp.stage === 'f' ? [c.f] : ({ po: 
 // Every league match still to play after today: the matchdays from lg.md on, and those moved past today from before
 /** @param {Season} S @param {LeagueKey} key @param {number} now @param {(md: number, i: number, m: number[], d: number) => void} fn */
 G.cal.pending = function (S, key, now, fn) {
-  var fx = G.season.fixtures(S, key), lo = S.lg[key].md, mv = S.cal.mv[key] || {};
+  var fx = G.season.fixtures(S, key), lo = S.lg[key].md, mv = G.sure(S.cal).mv[key] || {};
   Object.keys(mv).forEach(function (k) {
     if (mv[k] <= now) return;
     var p = k.split(':'), md = +p[0], h = +p[1];
@@ -164,7 +164,7 @@ G.cal.pending = function (S, key, now, fn) {
 // Every match still to play of the clubs of some leagues: their league, the cup round drawn, Europe
 /** @param {State} st @param {Dict<number>} keys @returns {Dict<CalBusy[]>} */
 G.cal.busy = function (st, keys) {
-  var S = st.S, cal = S.cal, now = G.cal.now(st), /** @type {Dict<CalBusy[]>} */ out = {};
+  var S = G.sure(st.S), cal = G.sure(S.cal), now = G.cal.now(st), /** @type {Dict<CalBusy[]>} */ out = {};
   var put = /** @param {number} id @param {number} d @param {string} lab @param {string} k */ function (id, d, lab, k) { if (d > now && out[id]) out[id].push({ d: d, lab: lab, k: k }); };
   Object.keys(keys).forEach(function (key) { S.lg[key].ids.forEach(function (id) { out[id] = []; }); });
   Object.keys(keys).forEach(function (key) {
@@ -205,7 +205,7 @@ G.cal.clash = function (busy, m, x, r, self) {
 // always before the last matchdays (with no rest asked, any free day will do); [date, step] or null
 /** @param {State} st @param {Dict<CalBusy[]>} busy @param {LeagueKey} key @param {number[]} m @param {number} x @param {number} r @param {string} self @returns {number[]|null} */
 G.cal.find = function (st, busy, key, m, x, r, self) {
-  var S = st.S, cal = S.cal, now = G.cal.now(st), N = cal.lg[key].length, limit = cal.lg[key][N - G.CFG2.CAL.LAST_FIXED], b = G.cal.blockOf(cal, x), dw = G.cal.dow(x);
+  var S = G.sure(st.S), cal = G.sure(S.cal), now = G.cal.now(st), N = cal.lg[key].length, limit = cal.lg[key][N - G.CFG2.CAL.LAST_FIXED], b = G.cal.blockOf(cal, x), dw = G.cal.dow(x);
   var ok = /** @param {number} y */ function (y) { var by = G.cal.blockOf(cal, y); return y !== x && y > now && y < limit && by >= 0 && by <= 3 && !G.cal.inBreak(cal, y) && !G.cal.clash(busy, m, y, r, self); };
   var mid = /** @param {number} y */ function (y) { var w = G.cal.dow(y); return w >= 1 && w <= 3; };
   if (dw >= 5) { var s = x - dw + 5, same = [s, s + 1, s + 2, s - 1]; for (var j = 0; j < 4; j++) if (ok(same[j])) return [same[j], 1]; }
@@ -220,7 +220,7 @@ G.cal.find = function (st, busy, key, m, x, r, self) {
 // The last matchdays never move; with no date that leaves 2 free days, one free day will do, then any other day.
 /** @param {State} st @param {ClubId[]|null} ids */
 G.cal.resolve = function (st, ids) {
-  var S = st.S, cal = S.cal, W = st.world, CAL = G.CFG2.CAL, now = G.cal.now(st), my = G.season.myClub(st), /** @type {Dict<number>} */ keys = {}, /** @type {Dict<number>} */ set = {};
+  var S = G.sure(st.S), cal = G.sure(S.cal), W = st.world, CAL = G.CFG2.CAL, now = G.cal.now(st), my = G.season.myClub(st), /** @type {Dict<number>} */ keys = {}, /** @type {Dict<number>} */ set = {};
   (ids || W.clubs.map(function (c) { return c.id; })).forEach(function (id) { set[id] = 1; if (S.lg[W.clubs[id].lg]) keys[W.clubs[id].lg] = 1; });
   var busy = G.cal.busy(st, keys), /** @type {Dict<CalBusy[]>} */ fixed = {};
   Object.keys(busy).forEach(function (id) { fixed[id] = busy[id].filter(function (e) { return e.k === 'c' || e.k === 'e'; }); });  // cups and Europe
@@ -233,7 +233,8 @@ G.cal.resolve = function (st, ids) {
       // with no date that leaves REST free days, settle for fewer: one free day, then just another day
       for (var r = CAL.REST, /** @type {number[]|null} */ y = null; r >= 0 && !y && G.cal.clash(busy, m, x, r, self); r--) y = G.cal.find(st, busy, key, m, x, r, self);
       if (!y) return;
-      m.forEach(function (id) { busy[id].forEach(function (e) { if (e.k === self) e.d = y[0]; }); });
+      var to = y;
+      m.forEach(function (id) { busy[id].forEach(function (e) { if (e.k === self) e.d = to[0]; }); });
       if (y[0] === G.cal.base(S, key, md, i)) delete mv[md + ':' + m[0]]; else mv[md + ':' + m[0]] = y[0];
       var cur = S.cur;
       if (cur && cur.days && cur.days.indexOf(y[0]) < 0 && G.cal.blockOf(cal, y[0]) === cur.b) { cur.days.push(y[0]); cur.days.sort(function (p, q) { return p - q; }); cur.D = cur.days.length; }

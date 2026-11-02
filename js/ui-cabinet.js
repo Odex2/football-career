@@ -41,7 +41,7 @@ G.ui.cabinet = function (st, who) {
 // The selected trophy, big, with every season it was won
 /** @param {State} st @param {string} who @returns {string} */
 G.ui.cabDetail = function (st, who) {
-  var k = G.ui.cab.sel[who], /** @type {TroItem} */ it = null, mem = 0, /** @type {Dict<Club>} */ clubs = {};
+  var k = G.ui.cab.sel[who], it = /** @type {TroItem|null} */ (null), mem = /** @type {number|undefined} */ (0), /** @type {Dict<Club>} */ clubs = {};
   if (!k) return '';
   ['tro', 'per'].forEach(function (c) { G.tro.shelves(st, who, c).forEach(function (s) { s.items.forEach(function (x) { if (x.k === k) { it = x; mem = s.mem; } }); }); });
   if (!it) return '';
@@ -60,7 +60,7 @@ G.ui.cabDetail = function (st, who) {
 G.ui.cabAct = function (el, act, v, w) {
   var C = G.ui.cab, wrap = /** @type {HTMLElement} */ (el.closest('.cab-wrap'));
   if (act === 'cab') { C.open[v] = !C.open[v]; C.anim = v; } else C.sel[v] = C.sel[v] === w ? null : w;
-  if (wrap) wrap.outerHTML = G.ui.cabinet(G.state, wrap.dataset.who);
+  if (wrap) wrap.outerHTML = G.ui.cabinet(G.sure(G.state), G.sure(wrap.dataset.who));
   C.anim = null;
 };
 

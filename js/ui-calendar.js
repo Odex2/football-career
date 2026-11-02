@@ -46,18 +46,18 @@ G.ui.calTags = function (st, e, now) {
     else if (opp && W.clubs[id] && W.clubs[id].riv.indexOf(opp.id) >= 0) t.push('🔥 derby');
     else if (opp && opp.rep >= G.CFG2.CAL.BIG_REP) t.push('⚔️ big match');
   }
-  if (e.moved !== undefined) t.push('⟳ ' + (e.moved < e.d ? 'rinviata dal ' : 'anticipata dal ') + G.cal.label(st.S.cal, e.moved).slice(4));
+  if (e.moved !== undefined) t.push('⟳ ' + (e.moved < e.d ? 'rinviata dal ' : 'anticipata dal ') + G.cal.label(G.sure(G.sure(st.S).cal), e.moved).slice(4));
   return t.length ? '<span class="ct">' + t.join(' · ') + '</span>' : '';
 };
 
 /** @param {State} st @param {CalEntry} e @param {number} now @returns {string} one line of the calendar */
 G.ui.calRow = function (st, e, now) {
-  var cal = st.S.cal, r = e.res, cls = r ? (r[0] > r[1] ? 'r-good' : r[0] < r[1] ? 'r-bad' : 'r-mid') : '';
+  var cal = G.sure(G.sure(st.S).cal), r = e.res, cls = r ? (r[0] > r[1] ? 'r-good' : r[0] < r[1] ? 'r-bad' : 'r-mid') : '';
   var res = e.ck === 'brk' ? '' : r ? '<b>' + r[0] + '-' + r[1] + '</b>' + (e.row && e.row.pen ? '<small>rigori</small>' : '') : '<span class="muted small">da giocare</span>';
   var line = '<span class="cd">' + G.cal.label(cal, e.d) + '</span><span class="ci">' + G.ui.calIcon(st, e) + '</span><span class="ch muted">' + G.ui.calWhere(e) + '</span>' +
     '<span class="co">' + G.ui.calOpp(st, e) + (e.ck === 'brk' ? '' : '<small class="muted">' + G.ui.calComp(e) + '</small>') + G.ui.calTags(st, e, now) + '</span><span class="cr ' + cls + '">' + res + '</span>';
   if (!e.row) return '<div class="calr' + (e.ck === 'brk' ? ' brk' : '') + '">' + line + '</div>';
-  var x = e.row, more = x.mgr ? (x.sc && x.sc.length ? '⚽ ' + x.sc.join(', ') : 'Nessun gol') + (x.form ? ' · ' + x.form + ', tattica ' + (G.mgr.TACTIC[x.tac] || '').toLowerCase() : '') :
+  var x = e.row, more = x.mgr ? (x.sc && x.sc.length ? '⚽ ' + x.sc.join(', ') : 'Nessun gol') + (x.form ? ' · ' + x.form + ', tattica ' + (G.mgr.TACTIC[x.tac || ''] || '').toLowerCase() : '') :
     x.mins ? x.mins + '’ in campo · voto <b class="' + G.ui.rcls(x.r) + '">' + x.r + '</b>' + (x.g ? ' · ⚽ ' + x.g : '') + (x.a ? ' · 🅰️ ' + x.a : '') : 'Non sei sceso in campo';
   return '<details class="calp"><summary class="calr">' + line + '</summary><div class="calx small">' + more + '</div></details>';
 };
@@ -65,7 +65,7 @@ G.ui.calRow = function (st, e, now) {
 // ---------- the tab ----------
 /** @param {State} st @returns {string} */
 G.ui.calendarTab = function (st) {
-  var S = st.S, cal = S.cal, f = G.ui.sel.calf || 'all', nt = !st.mgr && !!G.NT[st.player.nat];
+  var S = G.sure(st.S), cal = G.sure(S.cal), f = G.ui.sel.calf || 'all', nt = !st.mgr && !!G.NT[st.player.nat];
   if (!cal) return '<div class="grid">' + G.ui.card('📅 Calendario', '<p class="muted">Questa stagione è cominciata con una versione precedente del gioco, senza le date delle partite. Il calendario parte dalla prossima stagione.</p>', 'span3') + '</div>';
   var now = G.cal.now(st), cur = G.cal.date(cal, Math.max(0, now)), curM = cur.getUTCFullYear() * 12 + cur.getUTCMonth(), today = false;
   var list = G.cal.entries(st).filter(function (e) { return f === 'all' || G.ui.calKind(e) === f; }), /** @type {Dict<string[]>} */ months = {}, /** @type {number[]} */ keys = [];
@@ -79,7 +79,7 @@ G.ui.calendarTab = function (st) {
     var n = months[k].filter(function (h) { return h.indexOf('caltoday') < 0 && h.indexOf(' brk') < 0; }).length, name = G.cal.MONL[k % 12];
     return '<details class="calm"' + (k === curM ? ' open' : '') + '><summary><b>' + name.charAt(0).toUpperCase() + name.slice(1) + '</b> <span class="muted small">' + n + (n === 1 ? ' partita' : ' partite') + '</span></summary>' + months[k].join('') + '</details>';
   }).join('');
-  var tours = S.tours ? Object.keys(S.tours).map(function (k) { return S.tours[k].n + ' ' + S.tours[k].year; }).join(', ') : '';
+  var tours = S.tours ? Object.keys(S.tours).map(function (k) { return G.sure(S.tours)[k].n + ' ' + G.sure(S.tours)[k].year; }).join(', ') : '';
   var summer = '<div class="calm last"><b>Giugno–luglio</b> <span class="muted small">' + (tours ? '🌍 ' + tours + ': il torneo ha la sua schermata' + (nt ? ' · <span class="golink clickable" data-act="tab" data-v="nazionale">Nazionale ›</span>' : '') : 'vacanze e mercato estivo') + '</span></div>';
   var bar = '<div class="opts calf">' + G.ui.CAL_F.filter(function (x) { return x[0] !== 'nt' || nt; }).map(function (x) { return '<button data-act="calf" data-v="' + x[0] + '" class="' + (f === x[0] ? 'on' : 'ghost') + '">' + x[1] + '</button>'; }).join('') + '</div>';
   return '<div class="grid">' + G.ui.card('📅 Calendario ' + G.season.label(S.year), bar +
@@ -92,11 +92,11 @@ G.ui.calendarTab = function (st) {
 G.ui.nextCard = function (st) {
   var S = st.S;
   if (!S || !S.cal || S.block > 4) return '';
-  var now = G.cal.now(st), list = G.cal.entries(st).filter(function (e) { return e.d > now && !e.res; }).slice(0, G.CFG2.CAL.NEXT);
+  var cal = S.cal, now = G.cal.now(st), list = G.cal.entries(st).filter(function (e) { return e.d > now && !e.res; }).slice(0, G.CFG2.CAL.NEXT);
   var rows = list.map(function (e) {
     var opp = e.ck === 'brk' ? '<b>' + e.name + '</b>' : e.opp === null ? e.name + ' · ' + e.rd + ' · <span class="muted">avversario da sorteggiare</span>' : G.ui.calOpp(st, e);
     var imp = e.opp !== null && e.ck !== 'brk' ? G.season.importance(st, G.season.myClub(st), e) : null;
-    return '<div class="nxr"><span class="cd">' + G.cal.label(S.cal, e.d) + '</span><span class="ci">' + G.ui.calIcon(st, e) + '</span><span class="ch muted">' + (e.opp === null ? '' : G.ui.calWhere(e)) + '</span>' +
+    return '<div class="nxr"><span class="cd">' + G.cal.label(cal, e.d) + '</span><span class="ci">' + G.ui.calIcon(st, e) + '</span><span class="ch muted">' + (e.opp === null ? '' : G.ui.calWhere(e)) + '</span>' +
       '<span class="co">' + opp + (imp ? '<small class="ct">' + imp.tag + ' ' + imp.why + '</small>' : '') + '</span></div>';
   }).join('');
   return G.ui.homeCard('nextc', 'tab', 'calendario', '📅 Prossime partite', rows || '<p class="muted small">Nessuna partita da giocare in questa stagione.</p>', 'Tutto il calendario');

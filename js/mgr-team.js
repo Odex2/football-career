@@ -29,12 +29,12 @@ G.mgrTeam.fit = function (pl, r) {
   return G.mgrTeam.FIT[pl.r + '>' + r] || 12;
 };
 
-/** @param {Mgr} m @param {PlayerId} id @returns {number} */
+/** @param {MgrJob} m @param {PlayerId} id @returns {number} */
 G.mgrTeam.cond = function (m, id) { var c = m.cond && m.cond[id]; return c === undefined ? 100 : c; };
 
 // What a player is worth today in a slot: overall, position and fitness (only below COND_OK: a sensible rotation
 // costs nothing), his morale and his form (js/mgr-squad.js)
-/** @param {Mgr} m @param {Npc} pl @param {RoleKey} r @returns {number} */
+/** @param {MgrJob} m @param {Npc} pl @param {RoleKey} r @returns {number} */
 G.mgrTeam.eff = function (m, pl, r) {
   var T = G.CFG.MGR_TEAM;
   return pl.o - G.mgrTeam.fit(pl, r) - Math.max(0, T.COND_OK - G.mgrTeam.cond(m, pl.i)) * T.COND_K + G.mgrSq.eff(m, pl.i);
@@ -59,9 +59,9 @@ G.mgrTeam.init = function (m) {
 // the automatic pick rests a tired starter (fitness under REST_AT) when someone fresh can stand in, and never picks
 // an injured player while anyone else can play (an injured player kept in a manual XI is replaced).
 // fresh: overall and position only, as if everyone were fit and happy (the squad roles, js/mgr-squad.js)
-/** @param {State} st @param {XiSlot[]} [keep] @param {boolean} [fresh] @returns {XiSlot[]} */
+/** @param {State} st @param {XiSlot[]|null} [keep] @param {boolean} [fresh] @returns {XiSlot[]} */
 G.mgrTeam.auto = function (st, keep, fresh) {
-  var T = G.CFG.MGR_TEAM, m = st.mgr, W = st.world, club = W.clubs[m.club], /** @type {Dict<number>} */ used = {}, /** @type {XiSlot[]} */ xi = [], /** @type {number[]} */ fixed = [];
+  var T = G.CFG.MGR_TEAM, m = G.mgr.job(st), W = st.world, club = W.clubs[m.club], /** @type {Dict<number>} */ used = {}, /** @type {XiSlot[]} */ xi = [], /** @type {number[]} */ fixed = [];
   var sq = club.sq.map(function (id) { return W.players[id]; }), slots = G.mgrTeam.slots(m.form);
   var val = /** @param {Npc} pl @param {RoleKey} r */ function (pl, r) {
     return fresh ? pl.o - G.mgrTeam.fit(pl, r) : G.mgrTeam.eff(m, pl, r) - (G.mgrTeam.cond(m, pl.i) < T.REST_AT ? T.REST_PEN : 0) - (G.mgrSq.inj(m, pl.i) ? 1000 : 0);
@@ -74,7 +74,7 @@ G.mgrTeam.auto = function (st, keep, fresh) {
   [true, false].forEach(function (own) {
     slots.forEach(function (r, k) {
       if (xi[k]) return;
-      var /** @type {Npc} */ best = null, bv = -1e9;
+      var best = /** @type {Npc|null} */ (null), bv = -1e9;
       sq.forEach(function (pl) { if (!used[pl.i] && (!own || pl.r === r)) { var v = val(pl, r); if (v > bv) { bv = v; best = pl; } } });
       if (best) { used[best.i] = 1; xi[k] = { r: r, id: best.i }; }
     });
@@ -102,7 +102,7 @@ G.mgrTeam.auto = function (st, keep, fresh) {
 // The XI for the next match: automatic, or the manual one with gaps (sold players) filled
 /** @param {State} st @returns {XiSlot[]} */
 G.mgrTeam.xi = function (st) {
-  var m = st.mgr;
+  var m = G.mgr.job(st);
   G.mgrTeam.init(m);
   var keep = m.mode === 'manual' && m.xi && m.xi.length === 11 && m.xiForm === m.form ? m.xi : null;
   m.xi = G.mgrTeam.auto(st, keep); m.xiForm = m.form;
@@ -110,12 +110,12 @@ G.mgrTeam.xi = function (st) {
 };
 
 /** @param {State} st @param {string} f */
-G.mgrTeam.setForm = function (st, f) { if (G.mgrTeam.FORMS[f]) { st.mgr.form = f; G.mgrTeam.xi(st); } };
+G.mgrTeam.setForm = function (st, f) { if (G.mgrTeam.FORMS[f]) { G.mgr.job(st).form = f; G.mgrTeam.xi(st); } };
 
 // Manual pick: put player id in slot k (a player already in the XI swaps places)
 /** @param {State} st @param {number} k @param {PlayerId} id */
 G.mgrTeam.setSlot = function (st, k, id) {
-  var m = st.mgr, xi = G.mgrTeam.xi(st), j = -1;
+  var m = G.mgr.job(st), xi = G.mgrTeam.xi(st), j = -1;
   xi.forEach(function (x, i) { if (x.id === id) j = i; });
   if (j >= 0) xi[j].id = xi[k].id;
   xi[k].id = id; m.mode = 'manual';
@@ -124,27 +124,52 @@ G.mgrTeam.setSlot = function (st, k, id) {
 // Strength of the XI as the engine sees it (average effective overall plus the coach's bonus)
 /** @param {State} st @returns {number} */
 G.mgrTeam.str = function (st) {
-  var m = st.mgr, W = st.world, club = W.clubs[m.club], s = 0;
+  var m = G.mgr.job(st), W = st.world, club = W.clubs[m.club], s = 0;
   G.mgrTeam.xi(st).forEach(function (x) { s += G.mgrTeam.eff(m, W.players[x.id], x.r); });
   return s / 11 + G.coaches.bonus(W, club);
 };
 
-// Side used by the match engine for the managed club (same shape as G.match.side); the captain on the pitch adds CAP
-/** @param {State} st @param {Club} club @returns {MatchSide} */
-G.mgrTeam.side = function (st, club) {
-  var C = G.CFG, m = st.mgr, W = st.world, xi = G.mgrTeam.xi(st), /** @type {PlayerId[]} */ ids = [], sum = 0, eff = 0;
-  xi.forEach(function (x) { var pl = W.players[x.id]; ids.push(x.id); sum += pl.o; eff += G.mgrTeam.eff(m, pl, x.r); });
-  var bench = club.sq.filter(function (id) { return ids.indexOf(id) < 0 && !G.mgrSq.inj(m, id); }).map(function (id) { return W.players[id]; })
-    .sort(function (a, b) { return G.mgrTeam.eff(m, b, b.r) - G.mgrTeam.eff(m, a, a.r); }).slice(0, C.SUBS).map(function (pl) { return pl.i; });
-  var cap = m.cap !== null && m.cap !== undefined && ids.indexOf(m.cap) >= 0 ? G.CFG2.MGR_SQ.CAP : 0;
-  return { ids: ids, main: false, str: eff / 11 + G.coaches.bonus(W, club) + (m.morale - 50) / C.MGR.MORALE_DIV + cap, avg: sum / 11, cameOn: bench, mgr: 1 };
+// The same strength for any XI in any formation, changing nothing (M9 S1: the preview of a move or of a formation).
+// xi[k].id plays slot k of the formation: on today's XI and formation it gives G.mgrTeam.str
+/** @param {State} st @param {XiSlot[]} xi @param {string} form @returns {number} */
+G.mgrTeam.strWith = function (st, xi, form) {
+  var m = G.mgr.job(st), W = st.world, club = W.clubs[m.club], slots = G.mgrTeam.slots(form), s = 0;
+  xi.forEach(function (x, k) { s += G.mgrTeam.eff(m, W.players[x.id], slots[k] || x.r); });
+  return s / 11 + G.coaches.bonus(W, club);
 };
 
-// Formation and tactic as goal multipliers: [our attack, our defence]
-/** @param {Mgr} m @returns {number[]} */
-G.mgrTeam.mods = function (m) {
-  var F = G.mgrTeam.FORMS[m.form || '4-4-2'], T = G.mgrTeam.TACTIC[m.tactic || 'bal'];
-  return [F.atk + T[0], F.def + T[1]];
+// The XI the automatic pick would field today in formation form (the vice's advice), changing nothing
+/** @param {State} st @param {string} form @returns {XiSlot[]} */
+G.mgrTeam.autoFor = function (st, form) {
+  var m = G.mgr.job(st), f = m.form;
+  m.form = form;
+  try { return G.mgrTeam.auto(st); } finally { m.form = f; }
+};
+
+// Side used by the match engine for the managed club (same shape as G.match.side); the captain on the pitch adds CAP.
+// With the opponent and the competition the assistant's turnover may change the XI (js/mgr-rotate.js, not live)
+/** @param {State} st @param {Club} club @param {ClubId} [opp] @param {MatchComp} [comp] @returns {MatchSide} */
+G.mgrTeam.side = function (st, club, opp, comp) {
+  var C = G.CFG, m = G.mgr.job(st), W = st.world, xi = G.mgrTeam.xi(st), /** @type {PlayerId[]} */ ids = [], sum = 0, eff = 0, rw = '';
+  if (opp !== undefined && comp && !st.mgrHT && G.mgrRot.on(st)) { var P = G.mgrRot.plan(st, opp, comp); xi = P.xi; rw = P.w; }
+  xi.forEach(function (x) { var pl = W.players[x.id]; ids.push(x.id); sum += pl.o; eff += G.mgrTeam.eff(m, pl, x.r); });
+  var bench = club.sq.filter(function (id) { return ids.indexOf(id) < 0 && !G.mgrSq.inj(m, id); }).map(function (id) { return W.players[id]; })
+    .sort(function (a, b) { return G.mgrTeam.eff(m, b, b.r) - G.mgrTeam.eff(m, a, a.r); }).map(function (pl) { return pl.i; });
+  // the first substitutes picked by the manager (M9 S1, manual XI only) come first, the engine's order fills the rest
+  var mine = m.mode === 'manual' && m.bench ? m.bench.filter(function (id) { return bench.indexOf(id) >= 0; }) : [];
+  bench = mine.concat(bench.filter(function (id) { return mine.indexOf(id) < 0; })).slice(0, C.SUBS);
+  var cap = m.cap !== null && m.cap !== undefined && ids.indexOf(m.cap) >= 0 ? G.CFG2.MGR_SQ.CAP : 0;
+  var /** @type {MatchSide} */ side = { ids: ids, main: false, str: eff / 11 + G.coaches.bonus(W, club) + (m.morale - 50) / C.MGR.MORALE_DIV + cap + G.mgrTac.malus(m), avg: sum / 11, cameOn: bench, mgr: 1 };
+  if (rw) side.rw = rw;
+  return side;
+};
+
+// Formation, tactic and the levers against this opponent (M9 S6, js/mgr-tactics.js) as goal multipliers: [our attack,
+// our defence]
+/** @param {MgrJob} m @param {World} [W] @param {ClubId} [opp] @returns {number[]} */
+G.mgrTeam.mods = function (m, W, opp) {
+  var F = G.mgrTeam.FORMS[m.form || '4-4-2'], T = G.mgrTeam.TACTIC[m.tactic || 'bal'], L = G.mgrTac.mods(m, W, opp);
+  return [F.atk + T[0] + L[0], F.def + T[1] + L[1]];
 };
 
 // Score of a match with modifiers (modH/modA = [attack, defence] or null); half = the share of the match played
@@ -159,12 +184,13 @@ G.mgrTeam.sim = function (hs, as, modH, modA, rng, half) {
 // (faster or slower with the training, js/mgr-youth.js); starts are counted for youth growth
 /** @param {State} st @param {MatchSide} side */
 G.mgrTeam.after = function (st, side) {
-  var T = G.CFG.MGR_TEAM, m = st.mgr, W = st.world, club = W.clubs[m.club];
+  var T = G.CFG.MGR_TEAM, m = G.mgr.job(st), W = st.world, club = W.clubs[m.club];
   G.mgrSq.after(st, side);
+  G.mgrRot.after(st, side);
   club.sq.forEach(function (id) {
     var c = G.mgrTeam.cond(m, id), pl = W.players[id];
     // a half-time substitution (side.sub = [on, off]): both play half a match
-    if (side.ids.indexOf(id) >= 0) { c -= (T.COND_PLAY + (pl.a >= T.OLD ? T.COND_OLD : 0)) * (side.sub && side.sub[1] === id ? 0.5 : 1); m.starts[id] = (m.starts[id] || 0) + 1; }
+    if (side.ids.indexOf(id) >= 0) { c -= (T.COND_PLAY + (pl.a >= T.OLD ? T.COND_OLD : 0)) * (side.sub && side.sub[1] === id ? 0.5 : 1) * G.mgrTac.tire(m); m.starts[id] = (m.starts[id] || 0) + 1; }  // a high press tires (M9 S6)
     else if (side.sub && side.sub[0] === id) c -= T.COND_PLAY / 2;
     else c += T.COND_REST * G.mgrYouth.train(m).rest;
     m.cond[id] = Math.round(G.clamp(c, T.COND_MIN, 100));
@@ -176,10 +202,10 @@ G.mgrTeam.after = function (st, side) {
 // End of season: young players who got minutes grow, fitness and counters reset
 /** @param {State} st */
 G.mgrTeam.seasonEnd = function (st) {
-  var T = G.CFG.MGR_TEAM, m = st.mgr, W = st.world, club = W.clubs[m.club], n = 0;
+  var T = G.CFG.MGR_TEAM, m = G.mgr.job(st), W = st.world, club = W.clubs[m.club], n = 0;
   club.sq.forEach(function (id) {
     var pl = W.players[id];
-    if (pl.a <= 21 && m.played && (m.starts[id] || 0) >= m.played * T.YOUTH_SHARE) { pl.o = Math.min(pl.p, pl.o + T.YOUTH * (m.youthX || 1) * G.mgrYouth.train(m).grow); n++; }
+    if (pl.a <= 21 && m.played && (m.starts[id] || 0) >= m.played * T.YOUTH_SHARE) { pl.o = Math.min(pl.p, pl.o + T.YOUTH * (m.youthX || 1) * G.mgrAsk.ythX(m) * G.mgrYouth.train(m).grow); n++; }
   });
   if (n) G.news(st, '🌱 ' + n + (n > 1 ? ' giovani sono cresciuti' : ' giovane è cresciuto') + ' giocando con te');
   m.cond = {}; m.starts = {}; m.played = 0;

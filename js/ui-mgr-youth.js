@@ -29,7 +29,7 @@ G.ui.ysPot = function (x) { var r = G.mgrYouth.pot(x); return r[0] + '–' + r[1
 // ---------- the Vivaio tab ----------
 /** @param {State} st @returns {string} */
 G.ui.mgrYouth = function (st) {
-  var Y = G.CFG2.MGR_YOUTH, m = st.mgr, W = st.world, club = W.clubs[m.club];
+  var Y = G.CFG2.MGR_YOUTH, m = G.mgr.job(st), W = st.world, club = W.clubs[m.club];
   var fl = G.ui.flash && G.ui.flash.mgr ? '<div class="notice">' + G.ui.flash.mgr + '</div>' : '';
   var /** @type {Dict<string>} */ nats = {}, /** @type {Dict<string>} */ lvls = {};
   G.NT_IDS.slice().sort(function (a, b) { return G.NT[a].name.localeCompare(G.NT[b].name); }).forEach(function (id) { nats[id] = G.NT[id].flag + ' ' + G.NT[id].name; });
@@ -63,7 +63,7 @@ G.ui.mgrYouth = function (st) {
 // ---------- the training, on the Formazione tab ----------
 /** @param {State} st @returns {string} */
 G.ui.mgrTrain = function (st) {
-  var T = G.CFG2.MGR_YOUTH.TRAIN, cur = st.mgr.train || 'normale', pc = /** @param {number} x */ function (x) { return Math.round(Math.abs(x - 1) * 100) + '%'; };
+  var T = G.CFG2.MGR_YOUTH.TRAIN, cur = G.mgr.job(st).train || 'normale', pc = /** @param {number} x */ function (x) { return Math.round(Math.abs(x - 1) * 100) + '%'; };
   var /** @type {Dict<string[]>} */ D = {
     leggero: ['🧘 Leggero', 'Si recupera il ' + pc(T.leggero.rest) + ' più in fretta e ci si fa male il ' + pc(T.leggero.inj) + ' in meno, ma i giovani crescono il ' + pc(T.leggero.grow) + ' in meno'],
     normale: ['⚖️ Normale', 'Il solito equilibrio tra crescita, fatica e infortuni'],
@@ -77,12 +77,12 @@ G.ui.mgrTrain = function (st) {
 // ---------- a new role, on top of the Rosa tab ----------
 /** @param {State} st @returns {string} */
 G.ui.mgrDev = function (st) {
-  var Y = G.CFG2.MGR_YOUTH, m = st.mgr, id = G.ui.sel.dev, pl = id === null || id === undefined ? null : st.world.players[id];
+  var Y = G.CFG2.MGR_YOUTH, m = G.mgr.job(st), id = G.ui.sel.dev, pl = id === null || id === undefined ? null : st.world.players[id];
   if (!pl || pl.c !== m.club) return '';
   var d = m.dev[pl.i], near = G.mgrYouth.near(pl), body = '';
   if (d) body = '<div class="ydev small">Sta imparando il ruolo di ' + G.ROLES[d.to].name.toLowerCase() + ' ' + G.ui.meter(d.pr, 100) + d.pr + '%' + G.ui.btn('mdevx', pl.i + ':', '✖ Ferma', 'ghost small') + '</div>';
   else if (!near.length) body = '<div class="muted small">Non c’è un ruolo abbastanza vicino al suo.</div>';
-  else body = '<div class="row">' + near.map(function (r) { return G.ui.btn('mdevx', pl.i + ':' + r, '🔄 ' + G.ROLES[r].name + ' · oggi −' + G.mgrTeam.fit(pl, r) + ' di OVR'); }).join('') + '</div>';
+  else { var who = pl; body = '<div class="row">' + near.map(function (r) { return G.ui.btn('mdevx', who.i + ':' + r, '🔄 ' + G.ROLES[r].name + ' · oggi −' + G.mgrTeam.fit(who, r) + ' di OVR'); }).join('') + '</div>'; }
   return '<div class="notice sqreq"><div>🔄 <b>Nuovo ruolo per ' + pl.n + '</b> <span class="muted small">' + G.ROLES[pl.r].name + ' · OVR ' + Math.round(pl.o) + '</span></div>' + body +
     '<div class="muted small">Con ' + 100 / Y.DEV_RUN + ' blocchi da titolare (o ' + 100 / Y.DEV_IDLE + ' giocando poco) il nuovo ruolo diventa suo e ci rende al massimo. Fino ad allora, in quel ruolo rende meno.</div>' +
     G.ui.btn('mdevc', '', 'Chiudi', 'ghost small') + '</div>';
@@ -91,6 +91,6 @@ G.ui.mgrDev = function (st) {
 // The bench: boys who must be promoted or let go
 /** @param {State} st @returns {string} */
 G.ui.mgrYouthNotes = function (st) {
-  var n = G.mgrYouth.waiting(st.mgr);
+  var n = G.mgrYouth.waiting(G.mgr.job(st));
   return n ? '<div class="notice warn clickable" data-act="tab" data-v="vivaio">⏳ ' + (n === 1 ? 'Un ragazzo del vivaio ha' : n + ' ragazzi del vivaio hanno') + ' ' + G.CFG2.MGR_YOUTH.OUT_AGE + ' anni: promuovi o svincola.</div>' : '';
 };

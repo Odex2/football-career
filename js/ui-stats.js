@@ -60,7 +60,7 @@ G.ui.statsTab = function (st) {
   rlog.forEach(function (x) { if (years.indexOf(x.year) < 0) years.push(x.year); });
   years.sort(); var labels = years.map(short);
   var /** @type {ChartSeries[]} */ series = [{ name: 'Tu', color: G.ui.CH.me, pts: p.history.map(function (h) { return [short(h.year), h.ovr]; }) }];
-  if (rlog.length) series.push({ name: R.rival.n.split(' ').pop(), color: G.ui.CH.riv, dash: 1, pts: rlog.map(function (x) { return [short(x.year), x.o]; }) });
+  if (rlog.length) series.push({ name: G.squads.sur(G.sure(R.rival).n), color: G.ui.CH.riv, dash: 1, pts: rlog.map(function (x) { return [short(x.year), x.o]; }) });
   var bars = p.history.map(function (h) { return { label: short(h.year), g: h.goals, a: h.assists }; });
   var me = R.me, row = /** @param {string} l @param {string|number} v */ function (l, v) { return '<tr><td>' + l + '</td><td class="num"><b>' + v + '</b></td></tr>'; };
   var natName = /** @param {{ nt?: number, opp?: any }} m opp: a club id, or a nation code when nt */ function (m) { return m.nt ? G.national.name(m.opp) : W.clubs[m.opp] ? W.clubs[m.opp].name : ''; };
@@ -75,17 +75,17 @@ G.ui.statsTab = function (st) {
   if (lgKeys.indexOf(cur) < 0) lgKeys.push(cur);
   var lgs = '<table><tr><th>Campionato</th><th>Record di gol in una stagione</th><th class="num">Gol</th></tr>' + lgKeys.map(function (k) {
     var x = R.lg[k], L = G.leagueByKey(k);
-    return '<tr class="' + (x.me ? 'me' : '') + '"><td>' + G.NATIONS[L.nat].flag + ' ' + L.name + '</td><td>' + (x.n ? x.n + ' <span class="muted small">' + (x.real ? x.year + '/' + String(x.year + 1).slice(2) : G.season.label(x.year)) + '</span>' : '<span class="muted">nessuno oltre ' + x.g + '</span>') + '</td><td class="num"><b>' + x.g + '</b></td></tr>';
+    return '<tr class="' + (x.me ? 'me' : '') + '"><td>' + G.NATIONS[L.nat].flag + ' ' + L.name + '</td><td>' + (x.n ? x.n + ' <span class="muted small">' + (x.real ? x.year + '/' + String(G.sure(x.year) + 1).slice(2) : G.season.label(G.sure(x.year))) + '</span>' : '<span class="muted">nessuno oltre ' + x.g + '</span>') + '</td><td class="num"><b>' + x.g + '</b></td></tr>';
   }).join('') + '</table><p class="muted small">Batti il record con i gol in campionato: entri nella storia e guadagni fama.</p>';
-  var rv = R.rival, pl = G.rec.rivalPlayer(st), duel = rv ? G.rec.duel(st) : null;
+  var rv = R.rival, pl = G.rec.rivalPlayer(st), duel = rv ? G.rec.duel(st) : null, du = G.sure(duel);  // du is read only with a rival
   var rival = !rv ? '<p class="muted">Quando compi 19 anni i media ti trovano un rivale: il talento più forte della tua generazione.</p>' :
     '<div class="row"><div class="grow"><h2 style="margin:0">' + (pl ? G.ui.flag(pl.nt) + ' ' : '') + rv.n + '</h2><div class="muted">' +
       (pl ? G.ROLES[pl.r].label + ' · ' + pl.a + ' anni · ' + (pl.c >= 0 ? W.clubs[pl.c].name : 'svincolato') + ' · overall ' + Math.round(pl.o) : 'Ritirato nel ' + rv.ret) + '</div></div></div>' +
-    '<table><tr><th></th><th class="num">Tu</th><th class="num">' + rv.n.split(' ').pop() + '</th></tr>' +
-    '<tr><td>Gol (dal ' + rv.since + ')</td><td class="num"><b>' + duel.me.g + '</b></td><td class="num">' + duel.him.g + '</td></tr>' +
-    '<tr><td>Assist</td><td class="num"><b>' + duel.me.a + '</b></td><td class="num">' + duel.him.a + '</td></tr>' +
-    '<tr><td>Palloni d’Oro</td><td class="num"><b>' + duel.me.bdo + '</b></td><td class="num">' + duel.him.bdo + '</td></tr></table>' +
-    '<p class="small">Davanti a lui nel Pallone d’Oro in <b>' + duel.aheadBdo + '</b> stagioni su ' + duel.seasons + '.</p>';
+    '<table><tr><th></th><th class="num">Tu</th><th class="num">' + G.squads.sur(rv.n) + '</th></tr>' +
+    '<tr><td>Gol (dal ' + rv.since + ')</td><td class="num"><b>' + du.me.g + '</b></td><td class="num">' + du.him.g + '</td></tr>' +
+    '<tr><td>Assist</td><td class="num"><b>' + du.me.a + '</b></td><td class="num">' + du.him.a + '</td></tr>' +
+    '<tr><td>Palloni d’Oro</td><td class="num"><b>' + du.me.bdo + '</b></td><td class="num">' + du.him.bdo + '</td></tr></table>' +
+    '<p class="small">Davanti a lui nel Pallone d’Oro in <b>' + du.aheadBdo + '</b> stagioni su ' + du.seasons + '.</p>';
   var clubs = Object.keys(p.goalsAt || {}).map(/** @param {any} id a club id (an object key, so a string) */ function (id) {
     return '<tr><td>' + G.ui.club(+id, 16) + '</td><td class="num">' + (p.seasonsAt[id] || 0) + '</td><td class="num"><b>' + p.goalsAt[id] + '</b></td></tr>';
   }).join('');

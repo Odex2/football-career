@@ -14,18 +14,18 @@ G.mgrYouth.IN = { USA: 'negli Stati Uniti', UAE: 'negli Emirati Arabi', COD: 'ne
 
 /** @param {NationCode} nat @returns {string} */
 G.mgrYouth.inNat = function (nat) { return G.mgrYouth.IN[nat] || 'in ' + G.nationInfo(nat).name; };
-/** @param {Mgr} m @returns {{ rest: number, grow: number, inj: number }} */
+/** @param {MgrJob} m @returns {{ rest: number, grow: number, inj: number }} */
 G.mgrYouth.train = function (m) { return G.CFG2.MGR_YOUTH.TRAIN[m.train || 'normale'] || G.CFG2.MGR_YOUTH.TRAIN.normale; };
 
 // A new job
 /** @param {State} st */
-G.mgrYouth.start = function (st) { var m = st.mgr; m.ys = []; m.yth = []; m.dev = {}; m.train = m.train || 'normale'; };
+G.mgrYouth.start = function (st) { var m = G.mgr.job(st); m.ys = []; m.yth = []; m.dev = {}; m.train = m.train || 'normale'; };
 
 // ---------- E1 · the scouts ----------
 // A new scout, at level 1 in Brazil watching every role: paid for this season now
 /** @param {State} st @returns {string} why not, '' when hired */
 G.mgrYouth.hire = function (st) {
-  var Y = G.CFG2.MGR_YOUTH, m = st.mgr, club = st.world.clubs[m.club];
+  var Y = G.CFG2.MGR_YOUTH, m = G.mgr.job(st), club = st.world.clubs[m.club];
   if (m.ys.length >= Y.SCOUTS) return 'Hai già ' + Y.SCOUTS + ' osservatori.';
   if (club.bud < Y.LVL_COST[0]) return 'Non c’è budget per un osservatore.';
   club.bud = G.mgrDeal.r1(club.bud - Y.LVL_COST[0]);
@@ -34,13 +34,13 @@ G.mgrYouth.hire = function (st) {
 };
 
 /** @param {State} st @param {number} i */
-G.mgrYouth.fire = function (st, i) { st.mgr.ys.splice(i, 1); };
+G.mgrYouth.fire = function (st, i) { G.mgr.job(st).ys.splice(i, 1); };
 
 // Scout i watches another nation (k 'nat'), other roles ('focus') or works at another level ('lvl'): a higher
 // level costs the difference for this season, a lower one gives nothing back
 /** @param {State} st @param {number} i @param {string} k @param {string} v @returns {string} */
 G.mgrYouth.setScout = function (st, i, k, v) {
-  var Y = G.CFG2.MGR_YOUTH, m = st.mgr, s = m.ys[i], club = st.world.clubs[m.club];
+  var Y = G.CFG2.MGR_YOUTH, m = G.mgr.job(st), s = m.ys[i], club = st.world.clubs[m.club];
   if (!s) return '';
   if (k === 'nat' && G.NT[v]) s.nat = v;
   else if (k === 'focus' && G.mgrYouth.FOCUS[v]) s.focus = /** @type {YouthScout['focus']} */ (v);
@@ -56,7 +56,7 @@ G.mgrYouth.setScout = function (st, i, k, v) {
 // A new season: every scout is paid again, or leaves
 /** @param {State} st */
 G.mgrYouth.seasonStart = function (st) {
-  var Y = G.CFG2.MGR_YOUTH, m = st.mgr, club = st.world.clubs[m.club];
+  var Y = G.CFG2.MGR_YOUTH, m = G.mgr.job(st), club = st.world.clubs[m.club];
   if (!m.ys) return;
   m.ys = m.ys.filter(function (s) {
     var c = Y.LVL_COST[s.lvl - 1];
@@ -86,7 +86,7 @@ G.mgrYouth.pot = function (x) {
 // After every block: the scouts report (a full youth squad takes nobody), the plans of a new role go on
 /** @param {State} st */
 G.mgrYouth.block = function (st) {
-  var Y = G.CFG2.MGR_YOUTH, m = st.mgr, rng = G.rng;
+  var Y = G.CFG2.MGR_YOUTH, m = G.mgr.job(st), rng = G.rng;
   (m.ys || []).forEach(function (s) {
     if (!rng.chance(Y.FIND_P)) return;
     var x = G.mgrYouth.boy(s, rng), pot = G.mgrYouth.pot(x);
@@ -100,11 +100,11 @@ G.mgrYouth.block = function (st) {
 // ---------- E2 · the youth squad ----------
 /** @param {State} st @param {number} i @returns {string} what happened */
 G.mgrYouth.promote = function (st, i) {
-  var m = st.mgr, W = st.world, club = W.clubs[m.club], x = m.yth[i];
+  var m = G.mgr.job(st), W = st.world, club = W.clubs[m.club], x = m.yth[i];
   if (!x) return '';
   if (club.sq.length >= G.CFG.SQUAD_MAX) return 'La rosa è piena: fai spazio prima di promuovere ' + x.n + '.';
   var pl = G.squads.newPlayer(W, /** @type {Npc} */ ({ n: x.n, nt: x.nt, r: x.r, a: x.a, o: x.o, p: x.p, c: club.id, y: 3 }));
-  pl.w = G.squads.wage(pl.o, club); club.sq.push(pl.i);
+  pl.w = G.squads.wage(pl.o, club); pl.hg = club.id; club.sq.push(pl.i);
   m.yth.splice(i, 1);
   G.mgrSq.sync(st); m.sr[pl.i] = 'pro'; m.pm[pl.i] = 70;
   G.season.refresh(st);
@@ -113,16 +113,16 @@ G.mgrYouth.promote = function (st, i) {
 
 /** @param {State} st @param {number} i @returns {string} */
 G.mgrYouth.release = function (st, i) {
-  var x = st.mgr.yth[i];
+  var x = G.mgr.job(st).yth[i];
   if (!x) return '';
-  st.mgr.yth.splice(i, 1);
+  G.mgr.job(st).yth.splice(i, 1);
   return '👋 ' + x.n + ' lascia il vivaio.';
 };
 
 // The rule of the assistant (and of the simulation) for a boy who is OUT_AGE: promoted if worth it and there is room
 /** @param {State} st @param {string} who */
 G.mgrYouth.decide = function (st, who) {
-  var Y = G.CFG2.MGR_YOUTH, m = st.mgr, club = st.world.clubs[m.club];
+  var Y = G.CFG2.MGR_YOUTH, m = G.mgr.job(st), club = st.world.clubs[m.club];
   m.yth.filter(function (x) { return x.a >= Y.OUT_AGE; }).sort(function (a, b) { return b.p - a.p; }).forEach(function (x) {
     var i = m.yth.indexOf(x), t = x.p - x.f / 2 >= 72 && club.sq.length < G.CFG.SQUAD_MAX ? G.mgrYouth.promote(st, i) : G.mgrYouth.release(st, i);
     G.news(st, t.replace(/\.$/, '') + who);
@@ -133,7 +133,7 @@ G.mgrYouth.decide = function (st, who) {
 // before the first match
 /** @param {State} st */
 G.mgrYouth.seasonEnd = function (st) {
-  var Y = G.CFG2.MGR_YOUTH, m = st.mgr, rng = G.rng, k = G.mgrYouth.train(m).grow * (m.youthX || 1);
+  var Y = G.CFG2.MGR_YOUTH, m = G.mgr.job(st), rng = G.rng, k = G.mgrYouth.train(m).grow * (m.youthX || 1) * G.mgrAsk.ythX(m);
   if (!m.yth) return;
   m.yth.forEach(function (x) { x.a++; x.o = Math.min(x.p, Math.round((x.o + rng.int(Y.GROW[0], Y.GROW[1]) * k) * 10) / 10); });
   if (!m.assist || m.assist.youth) G.mgrYouth.decide(st, ' (ha deciso il vice)');
@@ -141,9 +141,9 @@ G.mgrYouth.seasonEnd = function (st) {
 
 // The first block begins (G.season block engine): who is still waiting is decided by the rule
 /** @param {State} st */
-G.mgrYouth.due = function (st) { if (G.mgr.active(st) && st.mgr.yth && st.mgr.yth.length) G.mgrYouth.decide(st, ' (ha deciso il vice)'); };
+G.mgrYouth.due = function (st) { if (G.mgr.active(st) && G.mgr.job(st).yth && G.mgr.job(st).yth.length) G.mgrYouth.decide(st, ' (ha deciso il vice)'); };
 
-/** @param {Mgr} m @returns {number} boys who must be promoted or let go */
+/** @param {MgrJob} m @returns {number} boys who must be promoted or let go */
 G.mgrYouth.waiting = function (m) { var Y = G.CFG2.MGR_YOUTH; return (m.yth || []).filter(function (x) { return x.a >= Y.OUT_AGE; }).length; };
 
 // ---------- E3 · a new role ----------
@@ -152,7 +152,7 @@ G.mgrYouth.near = function (pl) { return G.ROLE_KEYS.filter(function (r) { retur
 
 /** @param {State} st @param {PlayerId} id @param {string} to a role, '' to stop @returns {string} */
 G.mgrYouth.setDev = function (st, id, to) {
-  var m = st.mgr, pl = st.world.players[id];
+  var m = G.mgr.job(st), pl = st.world.players[id];
   if (!pl || pl.c !== m.club) return '';
   if (!to) { delete m.dev[id]; return pl.n + ' torna ad allenarsi nel suo ruolo.'; }
   if (G.mgrYouth.near(pl).indexOf(/** @type {RoleKey} */ (to)) < 0) return '';
@@ -163,7 +163,7 @@ G.mgrYouth.setDev = function (st, id, to) {
 // After every block: DEV_RUN for who started DEV_SHARE of the club's matches, DEV_IDLE otherwise; at 100 the new role
 /** @param {State} st */
 G.mgrYouth.devBlock = function (st) {
-  var Y = G.CFG2.MGR_YOUTH, m = st.mgr, W = st.world, rows = st.S.blockRows.filter(function (r) { return r.mgr; });
+  var Y = G.CFG2.MGR_YOUTH, m = G.mgr.job(st), W = st.world, rows = G.sure(st.S).blockRows.filter(function (r) { return r.mgr; });
   Object.keys(m.dev || {}).forEach(function (k) {
     var id = +k, d = m.dev[id], pl = W.players[id];
     if (!pl || pl.c !== m.club) { delete m.dev[id]; return; }
@@ -171,13 +171,13 @@ G.mgrYouth.devBlock = function (st) {
     d.pr = Math.min(100, d.pr + (rows.length && s >= rows.length * Y.DEV_SHARE ? Y.DEV_RUN : Y.DEV_IDLE));
     if (d.pr < 100) return;
     pl.r = d.to; delete m.dev[id];
-    G.news(st, '🔄 ' + pl.n.split(' ').slice(-1)[0] + ' ora è un ' + G.ROLES[pl.r].name.toLowerCase());
+    G.news(st, '🔄 ' + G.squads.sur(pl.n) + ' ora è un ' + G.ROLES[pl.r].name.toLowerCase());
   });
 };
 
 // Saves from before phase E
 /** @param {State} st */
 G.mgrYouth.migrate = function (st) {
-  var m = st.mgr;
+  var m = G.mgr.job(st);
   if (!m.ys) m.ys = []; if (!m.yth) m.yth = []; if (!m.dev) m.dev = {}; if (!m.train) m.train = 'normale';
 };

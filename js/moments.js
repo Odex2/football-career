@@ -69,7 +69,7 @@ G.moments.SCEN = [
     ['Presa sicura', ['usc', 'pos'], 0.06, 'stop', 'blocchi il pallone a terra senza rischi', 'la palla ti scivola dalle mani']] }
 ];
 
-/** @param {string} id @returns {Moment} */
+/** @param {string|undefined} id @returns {Moment|undefined} */
 G.moments.byId = function (id) { return G.moments.SCEN.filter(function (s) { return s.id === id; })[0]; };
 
 // A situation for the player's role, avoiding the last ones he had
@@ -102,7 +102,7 @@ G.moments.best = function (p, s, hint, opp) {
 // Is this a match that counts? Returns the reason, or ''
 /** @param {State} st @param {Club} club @param {Club} opp @param {string} [cupFinal] @returns {string} */
 G.moments.why = function (st, club, opp, cupFinal) {
-  var S = st.S, b = S.cur ? S.cur.b : S.block, L = G.leagueByKey(club.lg);
+  var S = G.sure(st.S), b = S.cur ? S.cur.b : S.block, L = G.leagueByKey(club.lg);
   if (cupFinal) return 'la finale di ' + cupFinal;
   if (club.riv.indexOf(opp.id) >= 0) return 'il derby con il ' + opp.name;
   if (b < 2 || opp.lg !== club.lg) return '';
@@ -115,14 +115,14 @@ G.moments.why = function (st, club, opp, cupFinal) {
 // The player's next match on the coming day, if it counts: { opp, why, key }
 /** @param {State} st @returns {{ opp: ClubId, why: string, key: string }|null} */
 G.moments.ahead = function (st) {
-  var S = st.S, cur = S.cur, club = st.world.clubs[st.player.clubId], f = (cur.d + 1) / cur.D, /** @type {{ opp: ClubId, cup?: string }} */ found = null;
+  var S = G.sure(st.S), cur = G.sure(S.cur), club = st.world.clubs[st.player.clubId], f = (cur.d + 1) / cur.D, /** @type {{ opp: ClubId, cup?: string }|null} */ found = null;
   if (cur.b > 4 || st.player.inj > 0) return null;
   if (cur.days) {
     // with a calendar: the club's match on the next date, a league match or the cup final (the rule of the moments is the same)
     var x = cur.days[cur.d], e = x === undefined ? null : G.cal.matchOn(st, club.id, x);
     if (e && typeof e.opp === 'number' && (e.ck === 'lg' || (e.ck === club.nat && e.rd === 'Finale'))) found = e.ck === 'lg' ? { opp: e.opp } : { opp: e.opp, cup: e.name };
     var w = found ? G.moments.why(st, club, st.world.clubs[found.opp], found.cup) : '';
-    return w ? { opp: found.opp, why: w, key: S.year + ':' + cur.b + ':' + cur.d } : null;
+    return found && w ? { opp: found.opp, why: w, key: S.year + ':' + cur.b + ':' + cur.d } : null;
   }
   var lg = S.lg[club.lg], fx = G.season.fixtures(S, club.lg), r = cur.lg[club.lg], target = Math.round(r[0] + (r[1] - r[0]) * f);
   for (var md = lg.md; md < target && !found; md++) fx[md].forEach(function (m) { if (m[0] === club.id || m[1] === club.id) found = { opp: m[0] === club.id ? m[1] : m[0] }; });
@@ -130,9 +130,11 @@ G.moments.ahead = function (st) {
     var c = cur.cup[k], cup = S.cups[k], tg = Math.min(c[0], Math.floor(c[0] * f + 0.5));
     if (c[1] < tg && cup.winner === null && cup.alive.length === 2 && cup.alive.indexOf(club.id) >= 0) found = { opp: cup.alive[0] === club.id ? cup.alive[1] : cup.alive[0], cup: cup.name };
   });
-  if (!found) return null;
-  var why = G.moments.why(st, club, st.world.clubs[found.opp], found.cup);
-  return why ? { opp: found.opp, why: why, key: S.year + ':' + cur.b + ':' + cur.d } : null;
+  // found is filled inside the callbacks above, where the checker does not follow it
+  var F = /** @type {{ opp: ClubId, cup?: string }|null} */ (found);
+  if (!F) return null;
+  var why = G.moments.why(st, club, st.world.clubs[F.opp], F.cup);
+  return why ? { opp: F.opp, why: why, key: S.year + ':' + cur.b + ':' + cur.d } : null;
 };
 
 /** @param {string} txt @param {Dict<string>} v @returns {string} */
@@ -141,7 +143,7 @@ G.moments.fill = function (txt, v) { return txt.replace(/\{(\w+)\}/g, function (
 // Playing live: stop before the day of a match that counts and ask; true = stop here
 /** @param {State} st @returns {boolean} */
 G.moments.stop = function (st) {
-  var S = st.S, cur = S.cur;
+  var S = G.sure(st.S), cur = G.sure(S.cur);
   if (!st.live || st.mgr || st.event || (cur.mom || 0) >= G.CFG.MOMENTS.PER_BLOCK) return false;
   var A = G.moments.ahead(st);
   if (!A || (st.momentPick && st.momentPick.key === A.key)) return false;
@@ -160,8 +162,8 @@ G.moments.stop = function (st) {
 
 /** @param {State} st @param {number|string} i */
 G.moments.pick = function (st, i) {
-  var ev = st.event;
-  st.momentPick = { key: ev.key, i: +i || 0, hint: ev.hint, sc: ev.sc };
+  var ev = G.sure(st.event);
+  st.momentPick = { key: G.sure(ev.key), i: +i || 0, hint: G.sure(ev.hint), sc: ev.sc };  // a moment card has both
   st.event = null;
 };
 
@@ -169,7 +171,7 @@ G.moments.pick = function (st, i) {
 /** @param {State} st @param {string} mine @param {ClubId} h @param {ClubId} a @param {number[]} res @param {MatchComp} comp @param {MatchPart} mp @returns {MomentOutcome|null} */
 G.moments.resolve = function (st, mine, h, a, res, comp, mp) {
   var cupFinal = comp.final;
-  var M = G.CFG.MOMENTS, S = st.S, cur = S.cur, p = st.player, W = st.world;
+  var M = G.CFG.MOMENTS, S = G.sure(st.S), cur = S.cur, p = st.player, W = st.world;
   if (!cur || cur.b > 4 || (!comp.lg && !cupFinal) || (cur.mom || 0) >= M.PER_BLOCK) return null;
   var club = W.clubs[p.clubId], opp = W.clubs[mine === 'h' ? a : h], why = G.moments.why(st, club, opp, cupFinal ? comp.name : '');
   if (!why) return null;

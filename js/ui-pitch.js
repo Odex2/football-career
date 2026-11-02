@@ -1,17 +1,17 @@
 // @ts-check
 // The formation on a pitch, like the squad screen of EA FC (M8 phase H): shirts instead of photos.
-// Manager: tap a player, then another, to swap them (G.ui.sel.mx, in memory only). Player: the club's
+// Manager: a tap selects a player, the panel of js/ui-pitch-edit.js changes the XI (M9 S1). Player: the club's
 // most likely XI, to look at. Pure functions that return HTML, like the rest of the interface.
 
 // 11 points [x %, y %, label] per formation, in the order of G.mgrTeam.slots (POR, DC, TS, CC, ES, ATT).
-// With cards 17% wide and 18.2% tall no two cards overlap (tests/checks-m8.js)
+// With cards 18% wide and 19.3% tall no two cards overlap (tests/checks-m8.js)
 /** @type {Dict<PitchPos[]>} */
 G.ui.PITCH_POS = {
   '4-4-2': [[50, 89, 'POR'], [37, 69, 'DC'], [63, 69, 'DC'], [12, 64, 'TS'], [88, 64, 'TD'], [37, 43, 'CC'], [63, 43, 'CC'], [12, 38, 'ES'], [88, 38, 'ED'], [37, 13, 'ATT'], [63, 13, 'ATT']],
   '4-3-3': [[50, 89, 'POR'], [37, 69, 'DC'], [63, 69, 'DC'], [12, 64, 'TS'], [88, 64, 'TD'], [27, 44, 'CC'], [50, 39, 'CC'], [73, 44, 'CC'], [14, 17, 'ES'], [86, 17, 'ED'], [50, 12, 'ATT']],
   '3-5-2': [[50, 89, 'POR'], [26, 67, 'DC'], [50, 69, 'DC'], [74, 67, 'DC'], [30, 45, 'CC'], [50, 48, 'CC'], [70, 45, 'CC'], [10, 40, 'ES'], [90, 40, 'ED'], [37, 13, 'ATT'], [63, 13, 'ATT']],
   '3-4-3': [[50, 89, 'POR'], [26, 67, 'DC'], [50, 69, 'DC'], [74, 67, 'DC'], [37, 44, 'CC'], [63, 44, 'CC'], [12, 41, 'ES'], [88, 41, 'ED'], [19, 17, 'ATT'], [50, 12, 'ATT'], [81, 17, 'ATT']],
-  '5-3-2': [[50, 89, 'POR'], [30, 68, 'DC'], [50, 69, 'DC'], [70, 68, 'DC'], [10, 62, 'TS'], [90, 62, 'TD'], [28, 44, 'CC'], [50, 41, 'CC'], [72, 44, 'CC'], [37, 13, 'ATT'], [63, 13, 'ATT']]
+  '5-3-2': [[50, 89, 'POR'], [30, 68, 'DC'], [50, 69, 'DC'], [70, 68, 'DC'], [10, 64, 'TS'], [90, 64, 'TD'], [28, 44, 'CC'], [50, 41, 'CC'], [72, 44, 'CC'], [37, 13, 'ATT'], [63, 13, 'ATT']]
 };
 
 // Pitch lines in perspective (viewBox 0..100, stretched to the pitch)
@@ -44,11 +44,10 @@ G.ui.shirt = function (club, label, gk) {
 /** @param {string} n @returns {string} */
 G.ui.initials = function (n) { var w = n.split(' '); return (w.length > 1 ? w[0].charAt(0) + w[w.length - 1].charAt(0) : n.slice(0, 2)).toUpperCase(); };
 
-// Names on the cards: the surname, with the initial of the first name when two players in view share it
+// Names on the cards: the surname ("de Jong" too), with the initial of the first name when two players in view share it
 /** @param {string[]} names @returns {Dict<string>} */
 G.ui.shortNames = function (names) {
-  /** @param {string} n */
-  var sur = function (n) { var i = n.indexOf(' '); return i > 0 ? n.slice(i + 1) : n; };
+  var sur = G.squads.sur;
   /** @type {Dict<number>} */ var count = {}, /** @type {Dict<string>} */ out = {};
   names.forEach(function (n) { count[sur(n)] = (count[sur(n)] || 0) + 1; });
   names.forEach(function (n) { out[n] = count[sur(n)] > 1 ? n.charAt(0) + '. ' + sur(n) : sur(n); });
@@ -65,60 +64,70 @@ G.ui.formOf = function (apps, sum) {
 /** @param {number} c @returns {string} */
 G.ui.condCls = function (c) { var K = G.CFG.MGR_TEAM; return c >= K.COND_OK ? '' : c >= K.REST_AT ? 'mid' : 'bad'; };
 
-// One card; pos = [x, y] on the pitch, or nothing on the bench
+// Form arrows (M9 S1): the average rating of the season, from ▲▲ to ▼
+/** @type {Dict<string>} */
+G.ui.ARROW = { up2: '▲▲', up: '▲', eq: '▶', dn: '▼' };
+
+// One card; pos = [x, y] on the pitch, or nothing on the bench. One big number; the border is the fit of the role
 /** @param {PitchCard} c @param {PitchPos} [pos] @returns {string} */
 G.ui.pitchCard = function (c, pos) {
-  var cls = 'pc' + (c.sel ? ' sel' : '') + (c.glow ? ' glow' : '') + (c.me ? ' me' : '') + (c.inj ? ' inj' : '') + (c.hint ? ' h' + c.hint[1] : '');
+  var cls = 'pc' + (c.sel ? ' sel' : '') + (c.glow ? ' glow' : '') + (c.me ? ' me' : '') + (c.inj ? ' inj' : '') + (c.fit ? ' f' + c.fit : '') + (c.hint ? ' h' + c.hint[1] : '');
   var tl = c.hint ? '<span class="hint ' + c.hint[1] + '">' + c.hint[0] + '</span>' : c.me && pos ? '<span class="tl me">TU</span>' :
-    pos ? '' : '<span class="tl">' + (c.sub ? '<span class="sub">↺ </span>' : '') + (c.me ? 'TU · ' : '') + c.r + '</span>';
-  return '<button class="' + cls + '" data-act="' + c.act + '" data-v="' + c.v + '" aria-label="' + c.aria + '"' + (pos ? ' style="left:' + pos[0] + '%;top:' + pos[1] + '%"' : '') + '>' +
+    pos ? '' : '<span class="tl">' + (c.me ? 'TU · ' : '') + c.r + '</span>';
+  return '<button class="' + cls + '" data-act="' + c.act + '" data-v="' + c.v + '" aria-label="' + c.aria + '"' + (pos ? ' style="left:' + pos[0] + '%;top:' + pos[1] + '%"' : '') + (c.drag ? ' draggable="true"' : '') + '>' +
     G.ui.shirt(c.club, c.ini, c.r === 'POR') + tl +
-    '<span class="tr"><span class="dia ' + c.form + '"></span><span class="ovr' + (c.low ? ' low' : '') + '">' + c.val + '</span></span>' +
+    '<span class="tr"><span class="fa ' + c.form + '">' + G.ui.ARROW[c.form] + '</span><span class="ovr">' + c.val + '</span></span>' +
+    (c.was !== undefined ? '<s class="was">' + c.was + '</s>' : '') +
     (c.off && pos ? '<span class="nat">' + c.r + '</span>' : '') + (c.inj ? '<span class="injb">🚑' + c.inj + '</span>' : '') +
     '<span class="bar"><i class="' + c.barCls + '" style="width:' + Math.round(G.clamp(c.bar, 0, 100)) + '%"></i></span>' +
-    '<span class="name">' + (c.cap ? '<span class="cap">C</span>' : '') + c.name + (c.heir ? ' 🌱' : '') + '</span></button>';
+    '<span class="name">' + (c.cap ? '<span class="cap">©</span>' : '') + c.name + (c.heir ? ' 🌱' : '') + (c.tired ? ' 💤' : '') + '</span></button>';
 };
 
-// The pitch (11 cards in the formation's points) and the bench
+// A bench card: compact, half as tall as on the pitch (M9 S1): role, name, the number and the fitness bar
+/** @param {PitchCard} c @returns {string} */
+G.ui.benchCard = function (c) {
+  var cls = 'pb' + (c.sel ? ' sel' : '') + (c.me ? ' me' : '') + (c.inj ? ' inj' : '') + (c.grp === 'first' ? ' first' : '');
+  return '<button class="' + cls + '" data-act="' + c.act + '" data-v="' + c.v + '" aria-label="' + c.aria + '"' + (c.drag ? ' draggable="true"' : '') + '>' +
+    '<span class="rl">' + (c.me ? 'TU · ' : '') + c.r + ' <span class="fa ' + c.form + '">' + G.ui.ARROW[c.form] + '</span></span><span class="ov">' + c.val + '</span>' +
+    '<span class="nm">' + (c.cap ? '<span class="cap">©</span>' : '') + c.name + (c.heir ? ' 🌱' : '') + (c.tired ? ' 💤' : '') + (c.inj ? ' 🚑' + c.inj : '') + '</span>' +
+    '<span class="bar"><i class="' + c.barCls + '" style="width:' + Math.round(G.clamp(c.bar, 0, 100)) + '%"></i></span></button>';
+};
+
+// The pitch (11 cards in the formation's points) and the bench, in rows when the cards say their group
 /** @param {PitchOpts} o @returns {{ field: string, bench: string }} */
 G.ui.pitch = function (o) {
-  var pos = G.ui.PITCH_POS[o.form] || G.ui.PITCH_POS['4-4-2'];
-  return { field: '<div class="pitch' + (o.selecting ? ' selecting' : '') + '">' + G.ui.pitchLines() + o.slots.map(function (c, k) { return G.ui.pitchCard(c, pos[k]); }).join('') + '</div>',
-    bench: '<div class="bench">' + o.bench.map(function (c) { return G.ui.pitchCard(c); }).join('') + '</div>' };
+  var pos = G.ui.PITCH_POS[o.form] || G.ui.PITCH_POS['4-4-2'], /** @type {Dict<string>} */ grp = { first: 'Primi cambi', bench: 'Panchina', out: 'Non disponibili' };
+  /** @param {PitchCard[]} cs */
+  var row = function (cs) { return '<div class="bench">' + cs.map(function (c) { return G.ui.benchCard(c); }).join('') + '</div>'; };
+  var bench = !o.bench.some(function (c) { return !!c.grp; }) ? row(o.bench) : Object.keys(grp).map(function (g) {
+    var cs = o.bench.filter(function (c) { return c.grp === g; });
+    return cs.length ? '<div class="bgrp bg-' + g + '"><div class="bgt">' + grp[g] + ' · ' + cs.length + '</div>' + row(cs) + '</div>' : '';
+  }).join('');
+  return { field: '<div class="pitch' + (o.selecting ? ' selecting' : '') + '">' + G.ui.pitchLines() + o.slots.map(function (c, k) { return G.ui.pitchCard(c, pos[k]); }).join('') + '</div>', bench: bench };
 };
 
-/** @returns {string} */
-G.ui.pitchLegend = function () {
-  return '<div class="legend"><span><b class="g"></b>nel suo ruolo</span><span><b class="y"></b>ruolo vicino</span><span><b class="o"></b>adattato</span><span><b class="r"></b>fuori ruolo</span></div>';
+// "❔ Come si legge", open the first time it is shown (a flag in the browser's storage); bar = what the bar shows
+/** @param {string} bar @returns {string} */
+G.ui.pitchLegend = function (bar) {
+  var seen = true;
+  try { seen = !!localStorage.getItem('pc_legend_seen'); if (!seen) localStorage.setItem('pc_legend_seen', '1'); } catch (e) {}
+  return '<details class="plegend"' + (seen ? '' : ' open') + '><summary>❔ Come si legge</summary><div class="legend">' +
+    '<span><b class="g"></b>nel suo ruolo</span><span><b class="y"></b>ruolo vicino</span><span><b class="o"></b>adattato</span><span><b class="r"></b>fuori ruolo</span></div>' +
+    '<div class="legend"><span>Forma: ▲▲ ottima · ▲ buona · ▶ normale · ▼ cattiva</span><span><s>59</s> overall, fuori ruolo</span></div>' +
+    '<div class="legend"><span>© capitano</span><span>🚑 infortunato, per le partite indicate</span><span>🌱 erede</span><span>💤 stanco</span><span>La barra: ' + bar + '</span></div></details>';
 };
 
 // One row of the player's sheet
 /** @param {string} k @param {string|number} v @returns {string} */
 G.ui.pRow = function (k, v) { return '<div class="prow"><span class="muted">' + k + '</span><b>' + v + '</b></div>'; };
 
-// Clicks on the pitch: 'view' = show only, 'keep' = the XI changed (saved), false = not a pitch action
+// Clicks on the pitch: 'view' = show only, 'keep' = the XI changed (saved), false = not a pitch action.
+// The manager's actions are in js/ui-pitch-edit.js
 /** @param {State} st @param {string} act @param {string} v @returns {string|boolean} */
 G.ui.pitchAct = function (st, act, v) {
   if (act === 'pview') { G.ui.sel.pview = v; return 'view'; }
   if (act === 'pxsel') { G.ui.sel.px = G.ui.sel.px === v ? null : v; return 'view'; }
-  if (act === 'mxcancel') { G.ui.sel.mx = null; return 'view'; }
-  if (act !== 'mxsel' || !G.mgr.active(st)) return false;
-  var x = v.split(':'), k = x[0] === 's' ? 'slot' : 'bench', id = +x[1], cur = G.ui.sel.mx, W = st.world, xi = G.mgrTeam.xi(st);
-  /** @param {PlayerId} i */
-  var nm = function (i) { var n = W.players[i].n; return n.slice(n.indexOf(' ') + 1); };
-  if (!cur || (cur.k === 'bench' && k === 'bench' && cur.id !== id)) { G.ui.sel.mx = { k: k, id: id }; return 'view'; }
-  if (cur.k === k && cur.id === id) { G.ui.sel.mx = null; return 'view'; }
-  if (cur.k === 'slot' && k === 'slot') {
-    var a = xi[cur.id].id, b = xi[id].id;
-    G.mgrTeam.setSlot(st, id, a);
-    G.ui.flash = { mgr: '↔️ Scambiati ' + nm(a) + ' e ' + nm(b) };
-  } else {
-    var slot = cur.k === 'slot' ? cur.id : id, inId = cur.k === 'bench' ? cur.id : id, out = xi[slot].id;
-    G.mgrTeam.setSlot(st, slot, inId);
-    G.ui.flash = { mgr: '🔁 Dentro ' + nm(inId) + ', fuori ' + nm(out) };
-  }
-  G.ui.sel.mx = null;
-  return 'keep';
+  return G.pe.act(st, act, v);
 };
 
 /** @param {number} fit @returns {string} */
@@ -129,7 +138,7 @@ G.ui.fitCls = function (fit) { return fit === 0 ? 'g' : fit <= 4 ? 'y' : fit <= 
 // The selected player (G.ui.sel.mx), or null when there is none (or he left the squad)
 /** @param {State} st @returns {Npc|null} */
 G.ui.mxPlayer = function (st) {
-  var mx = G.ui.sel.mx, club = st.world.clubs[st.mgr.club], xi = st.mgr.xi || [];
+  var mx = G.ui.sel.mx, club = st.world.clubs[G.mgr.job(st).club], xi = G.mgr.job(st).xi || [];
   var id = !mx ? -1 : mx.k === 'slot' ? (xi[mx.id] ? xi[mx.id].id : -1) : mx.id;
   if (mx && club.sq.indexOf(id) < 0) G.ui.sel.mx = null;
   return G.ui.sel.mx ? st.world.players[id] : null;
@@ -137,63 +146,51 @@ G.ui.mxPlayer = function (st) {
 
 /** @param {State} st @returns {PitchOpts} */
 G.ui.mgrPitchOpts = function (st) {
-  var W = st.world, m = st.mgr, club = W.clubs[m.club], T = G.mgrTeam, xi = T.xi(st), view = G.ui.sel.pview || 'val', mx = G.ui.sel.mx, sp = G.ui.mxPlayer(st);
+  var W = st.world, m = G.mgr.job(st), club = W.clubs[m.club], T = G.mgrTeam, xi = T.xi(st), view = G.ui.sel.pview || 'val', mx = G.ui.sel.mx, sp = G.ui.mxPlayer(st);
   var names = G.ui.shortNames(club.sq.map(function (id) { return W.players[id].n; })), subs = T.side(st, club).cameOn, /** @type {Dict<number>} */ inXi = {};
+  var moving = !!sp && G.ui.sel.pmode === 'move', now = T.strWith(st, xi, m.form), REST = G.CFG.MGR_TEAM.REST_AT;
   xi.forEach(function (x) { inXi[x.id] = 1; });
+  // moving the selected player to slot k: the Forza XI after the move, against now
+  /** @param {number} k @returns {[string, string]|undefined} */
+  var hint = function (k) {
+    if (!moving || !sp || (mx.k === 'slot' && mx.id === k)) return undefined;
+    var to = G.pe.moved(xi, mx.k === 'slot' ? 'swap' : 'in', mx.k === 'slot' ? mx.id : k, mx.k === 'slot' ? k : sp.i);
+    return [G.pe.delta(T.strWith(st, to, m.form) - now), G.ui.fitCls(T.fit(sp, xi[k].r))];
+  };
   /** @param {Npc} pl @param {RoleKey|null} r the slot's role (null on the bench) @param {number} k @returns {PitchCard} */
   var card = function (pl, r, k) {
-    var c = T.cond(m, pl.i), fo = G.ui.formOf(pl.s[5], pl.s[9]), worth = Math.round(r ? T.eff(m, pl, r) : pl.o);
+    var c = T.cond(m, pl.i), fo = G.ui.formOf(pl.s[5], pl.s[9]), worth = Math.round(r ? T.eff(m, pl, r) : pl.o), inj = G.mgrSq.inj(m, pl.i);
     var val = view === 'cond' ? c : view === 'form' ? (pl.s[5] ? fo.avg.toFixed(1) : '–') : worth;
-    return { club: club, name: names[pl.n] + (m.cap === pl.i ? ' ©' : '') + (G.mgrSq.inj(m, pl.i) ? ' 🚑' : ''), ini: G.ui.initials(pl.n), r: pl.r, val: val, low: view === 'val' && !!r && worth < Math.round(pl.o), bar: c, barCls: G.ui.condCls(c),
-      form: fo.f, glow: fo.glow, heir: !!pl.heir, sub: !r && subs.indexOf(pl.i) >= 0, off: !!r && pl.r !== r,
-      sel: !!(sp && sp.i === pl.i && (r ? mx.k === 'slot' : mx.k === 'bench')), hint: sp && r ? [Math.round(T.eff(m, sp, r)), G.ui.fitCls(T.fit(sp, r))] : undefined,
-      act: 'mxsel', v: r ? 's:' + k : 'b:' + pl.i, aria: pl.n + ', ' + pl.r + ', valore ' + worth + ', condizione ' + c };
+    return { club: club, name: names[pl.n], ini: G.ui.initials(pl.n), r: pl.r, val: val, bar: c, barCls: G.ui.condCls(c),
+      form: fo.f, glow: fo.glow, heir: !!pl.heir, cap: m.cap === pl.i, inj: inj, tired: c < REST, off: !!r && pl.r !== r, fit: r ? G.ui.fitCls(T.fit(pl, r)) : undefined,
+      was: view === 'val' && r && pl.r !== r ? Math.round(pl.o) : undefined, grp: r ? undefined : inj ? 'out' : subs.indexOf(pl.i) >= 0 ? 'first' : 'bench',
+      sel: !!(sp && sp.i === pl.i && (r ? mx.k === 'slot' : mx.k === 'bench')), hint: r ? hint(k) : undefined, drag: G.pe.fine(),
+      act: 'mxsel', v: r ? 's:' + k : 'b:' + pl.i, aria: pl.n + ', ' + pl.r + ', rende ' + worth + ', condizione ' + c + (inj ? ', infortunato' : '') };
   };
   var bench = club.sq.filter(function (id) { return !inXi[id]; }).map(function (id) { return W.players[id]; }).sort(function (a, b) {
     var sa = subs.indexOf(a.i), sb = subs.indexOf(b.i);
     if (sa >= 0 || sb >= 0) return (sa < 0 ? 99 : sa) - (sb < 0 ? 99 : sb);
     return (G.ROLE_KEYS.indexOf(a.r) - G.ROLE_KEYS.indexOf(b.r)) || (b.o - a.o);
   });
-  return { form: m.form, selecting: !!sp, slots: xi.map(function (x, k) { return card(W.players[x.id], x.r, k); }), bench: bench.map(function (pl) { return card(pl, null, -1); }) };
+  return { form: m.form, selecting: moving, slots: xi.map(function (x, k) { return card(W.players[x.id], x.r, k); }), bench: bench.map(function (pl) { return card(pl, null, -1); }) };
 };
 
 // The selected player's sheet (side card on a computer)
 /** @param {State} st @param {Npc} pl @returns {string} */
 G.ui.mgrPlayerSheet = function (st, pl) {
-  var club = st.world.clubs[st.mgr.club], fo = G.ui.formOf(pl.s[5], pl.s[9]);
+  var club = st.world.clubs[G.mgr.job(st).club], fo = G.ui.formOf(pl.s[5], pl.s[9]);
   return '<div class="phd"><div class="pshirt">' + G.ui.shirt(club, G.ui.initials(pl.n), pl.r === 'POR') + '</div><div><b class="big">' + pl.n + (pl.heir ? ' 🌱' : '') + '</b><div class="muted small">' + G.ui.flag(pl.nt) + ' ' + G.ROLES[pl.r].name + ' · ' + pl.a + ' anni</div></div></div>' +
-    G.ui.pRow('Overall', Math.round(pl.o)) + G.ui.pRow('Potenziale', Math.round(pl.p)) + G.ui.pRow('Condizione', G.mgrTeam.cond(st.mgr, pl.i) + '%') + G.ui.sqRows(st, pl) +
-    G.ui.pRow('Stagione', pl.s[5] + ' pres · ' + pl.s[6] + ' gol · ' + pl.s[7] + ' ass' + (pl.s[5] ? ' · ' + fo.avg.toFixed(2) : '')) + G.ui.pRow('Contratto', pl.y + (pl.y === 1 ? ' anno · ' : ' anni · ') + pl.w + ' k€/sett.') +
-    '<div class="opts" style="margin-top:10px"><a class="btn-like ghost small" href="#sq-' + pl.i + '">Scheda completa</a><button class="ghost small" data-act="mxcancel">Annulla</button></div>';
-};
-
-// The formation tab: formations, mode and views above the pitch, the bench below, the selected player aside
-/** @param {State} st @returns {string} */
-G.ui.mgrFormation = function (st) {
-  var m = st.mgr, T = G.mgrTeam, o = G.ui.mgrPitchOpts(st), P = G.ui.pitch(o), club = st.world.clubs[m.club], view = G.ui.sel.pview || 'val', sp = G.ui.mxPlayer(st);
-  /** @type {Dict<string>} */ var views = { val: 'Valore', cond: 'Condizione', form: 'Forma' };
-  var forms = G.ui.mgrOpts('mform', Object.keys(T.FORMS).reduce(function (x, k) { x[k] = k; return x; }, /** @type {Dict<string>} */ ({})), m.form, function (k) { return T.FORMS[k].d; });
-  var head = '<div class="phead">' + forms + '<div><span class="chip">' + (m.mode === 'auto' ? '🤖 Automatica' : '✋ Manuale') + '</span>' +
-    (m.mode === 'manual' ? '<button class="ghost small" data-act="mmode" data-v="auto">Torna all’automatica</button> ' : '') + '<span class="chip">Forza XI <b>' + T.str(st).toFixed(1) + '</b></span></div></div>' +
-    '<div class="phead"><div class="seg">' + Object.keys(views).map(function (k) { return '<button data-act="pview" data-v="' + k + '" class="' + (view === k ? 'on' : '') + '">' + views[k] + '</button>'; }).join('') + '</div>' +
-    '<span class="muted small">Tocca due giocatori per scambiarli</span></div>';
-  var fl = G.ui.flash && G.ui.flash.mgr ? '<div class="notice">' + G.ui.flash.mgr + '</div>' : '';
-  var bar = sp ? '<div class="selbar">' + G.ui.shirt(club, G.ui.initials(sp.n), sp.r === 'POR') + '<div class="txt"><b>' + sp.n + '</b> · ' + sp.r + ' · ' + Math.round(sp.o) + ' · ' + sp.a + ' anni · condizione ' + T.cond(m, sp.i) + '%<br>' +
-    '<span class="muted">Tocca un giocatore in campo: il numero sulla sua carta è quanto renderebbe lì.</span></div><button class="ghost small" data-act="mxcancel">Annulla</button></div>' : '';
-  var side = '<div class="card pside"><h3>' + (sp ? 'Giocatore selezionato' : 'Formazione') + '</h3>' + (sp ? G.ui.mgrPlayerSheet(st, sp) : '<p class="muted small">Tocca un giocatore per vedere la sua scheda, poi un altro per scambiarli.</p>') +
-    '<h3 style="margin-top:16px">Modulo</h3><div class="muted small">' + m.form + ': ' + T.FORMS[m.form].d + '. ' + (m.mode === 'auto' ? 'In automatico giocano i migliori per il modulo e chi è stanco riposa: scambia due giocatori per passare al manuale.' :
-      'In manuale l’undici resta quello che scegli: attento alla condizione, chi gioca sempre si stanca e rende meno.') + ' Fuori ruolo un giocatore perde qualche punto.</div></div>';
-  return '<div class="playout"><div class="stack"><div class="card">' + fl + head + P.field + bar + (o.selecting ? G.ui.pitchLegend() : '') + '</div>' +
-    '<div class="card"><h3>Panchina · ' + o.bench.length + '</h3>' + P.bench + '</div></div>' + side + '</div>';
+    G.ui.pRow('Overall', Math.round(pl.o)) + G.ui.pRow('Potenziale', Math.round(pl.p)) + G.ui.pRow('Condizione', G.mgrTeam.cond(G.mgr.job(st), pl.i) + '%') + G.ui.sqRows(st, pl) +
+    G.ui.pRow('Stagione', pl.s[5] + ' pres · ' + pl.s[6] + ' gol · ' + pl.s[7] + ' ass' + (pl.s[5] ? ' · ' + fo.avg.toFixed(2) : '')) + G.ui.pRow('Contratto', pl.y + (pl.y === 1 ? ' anno · ' : ' anni · ') + pl.w + ' k€/sett.');
 };
 
 // ---------- player: the club's most likely XI ----------
 
 /** @param {State} st @returns {{ o: PitchOpts, chance: number, meIn: boolean }} */
 G.ui.squadPitchOpts = function (st) {
-  var W = st.world, p = st.player, club = W.clubs[p.clubId], S = st.S, slots = G.mgrTeam.slots('4-4-2'), /** @type {number[]} */ at = [], /** @type {number[]} */ rest = [];
+  var W = st.world, p = st.player, club = W.clubs[p.clubId], S = G.sure(st.S), slots = G.mgrTeam.slots('4-4-2'), /** @type {number[]} */ at = [], /** @type {number[]} */ rest = [];
   var chance = G.season.startChance(st), meIn = chance >= 0.5, sel = G.ui.sel.px;
-  club.xi.forEach(function (id) {
+  G.sure(club.xi).forEach(function (id) {
     for (var k = 0; k < 11; k++) if (at[k] === undefined && slots[k] === W.players[id].r) { at[k] = id; return; }
     rest.push(id);
   });
@@ -211,11 +208,11 @@ G.ui.squadPitchOpts = function (st) {
     if (id < 0) {
       var fo = G.ui.formOf(S.ps.rN, S.ps.rSum);
       return { club: club, name: names[p.name], ini: G.ui.initials(p.name), r: p.role, val: p.ovr, bar: S.ps.apps / most * 100, barCls: cls(S.ps.apps), me: true, cap: p.captain === club.id,
-        form: p.form >= 1 ? 'up2' : p.form >= 0.3 ? 'up' : p.form <= -0.3 ? 'dn' : 'eq', glow: fo.glow, sel: sel === 'me', act: 'pxsel', v: 'me', aria: p.name + ' (tu), ' + p.role + ', overall ' + p.ovr };
+        form: p.form >= 1 ? 'up2' : p.form >= 0.3 ? 'up' : p.form <= -0.3 ? 'dn' : 'eq', glow: fo.glow, fit: on ? 'g' : undefined, sel: sel === 'me', act: 'pxsel', v: 'me', aria: p.name + ' (tu), ' + G.POS[G.pos.of(p)].n + ', overall ' + p.ovr };
     }
     var pl = W.players[id], f = G.ui.formOf(pl.s[5], pl.s[9]);
     return { club: club, name: names[pl.n], ini: G.ui.initials(pl.n), r: pl.r, val: Math.round(pl.o), bar: pl.s[5] / most * 100, barCls: cls(pl.s[5]), form: f.f, glow: f.glow,
-      off: on && pl.r !== slots[at.indexOf(id)], sel: sel === String(id), act: 'pxsel', v: String(id), aria: pl.n + ', ' + pl.r + ', overall ' + Math.round(pl.o) + ', ' + pl.s[5] + ' presenze' };
+      off: on && pl.r !== slots[at.indexOf(id)], fit: on ? G.ui.fitCls(G.mgrTeam.fit(pl, slots[at.indexOf(id)])) : undefined, sel: sel === String(id), act: 'pxsel', v: String(id), aria: pl.n + ', ' + pl.r + ', overall ' + Math.round(pl.o) + ', ' + pl.s[5] + ' presenze' };
   };
   var bench = club.sq.filter(function (id) { return at.indexOf(id) < 0; }).sort(function (a, b) { var x = W.players[a], y = W.players[b]; return (G.ROLE_KEYS.indexOf(x.r) - G.ROLE_KEYS.indexOf(y.r)) || (y.o - x.o); });
   if (!meIn) bench.unshift(-1);
@@ -225,19 +222,20 @@ G.ui.squadPitchOpts = function (st) {
 // The 👥 Squad tab of the playing career: the pitch, to look at; a tap shows the player's numbers
 /** @param {State} st @returns {string} */
 G.ui.squadPitch = function (st) {
-  var x = G.ui.squadPitchOpts(st), P = G.ui.pitch(x.o), W = st.world, p = st.player, S = st.S, sel = G.ui.sel.px, club = W.clubs[p.clubId], pl = sel && sel !== 'me' ? W.players[+sel] : null;
+  var x = G.ui.squadPitchOpts(st), P = G.ui.pitch(x.o), W = st.world, p = st.player, S = G.sure(st.S), sel = G.ui.sel.px, club = W.clubs[p.clubId], pl = sel && sel !== 'me' ? W.players[+sel] : null;
   if (pl && pl.c !== club.id) pl = null;
   var me = sel === 'me', avg = S.ps.rN ? (S.ps.rSum / S.ps.rN).toFixed(2) : '-';
-  var info = me ? '<div class="phd"><div class="pshirt">' + G.ui.shirt(club, G.ui.initials(p.name), p.role === 'POR') + '</div><div><b class="big">' + p.name + ' (tu)</b><div class="muted small">' + G.ROLES[p.role].name + ' · ' + p.age + ' anni</div></div></div>' +
-      G.ui.pRow('Overall', p.ovr) + G.ui.pRow('Titolare', Math.round(x.chance * 100) + '% delle partite') + G.ui.pRow('Stagione', S.ps.apps + ' pres · ' + S.ps.goals + ' gol · ' + S.ps.assists + ' ass · ' + avg) + G.ui.pRow('Contratto', p.contract.years + (p.contract.years === 1 ? ' anno · ' : ' anni · ') + p.contract.role) :
+  var info = me ? '<div class="phd"><div class="pshirt">' + G.ui.shirt(club, G.ui.initials(p.name), p.role === 'POR') + '</div><div><b class="big">' + p.name + ' (tu)</b><div class="muted small">' + G.POS[G.pos.of(p)].n + ' · ' + p.age + ' anni</div></div></div>' +
+      G.ui.pRow('Overall', p.ovr) + G.ui.pRow('Titolare', Math.round(x.chance * 100) + '% delle partite') + G.ui.pRow('Stagione', S.ps.apps + ' pres · ' + S.ps.goals + ' gol · ' + S.ps.assists + ' ass · ' + avg) + G.ui.pRow('Contratto', G.sure(p.contract).years + (G.sure(p.contract).years === 1 ? ' anno · ' : ' anni · ') + G.sure(p.contract).role) :
     pl ? '<div class="phd"><div class="pshirt">' + G.ui.shirt(club, G.ui.initials(pl.n), pl.r === 'POR') + '</div><div><b class="big">' + pl.n + '</b><div class="muted small">' + G.ui.flag(pl.nt) + ' ' + G.ROLES[pl.r].name + ' · ' + pl.a + ' anni</div></div></div>' +
       G.ui.pRow('Overall', Math.round(pl.o)) + G.ui.pRow('Stagione', pl.s[5] + ' pres · ' + pl.s[6] + ' gol · ' + pl.s[7] + ' ass' + (pl.s[5] ? ' · ' + (pl.s[9] / pl.s[5]).toFixed(2) : '')) + G.ui.pRow('Contratto', pl.y + (pl.y === 1 ? ' anno' : ' anni')) : '';
   var note = '<p class="muted small">È la formazione più probabile: il mister cambia qualcosa a ogni partita.' + (x.meIn ? '' : ' <b>Sei in panchina: titolare nel ' + Math.round(x.chance * 100) + '% delle partite.</b>') + '</p>';
   var bar = info ? '<div class="selbar"><div class="txt">' + info + '</div><button class="ghost small" data-act="pxsel" data-v="' + sel + '">Chiudi</button></div>' : '';
-  return '<div class="playout"><div class="stack"><div class="card"><h3>Formazione tipo · 4-4-2</h3>' + P.field + note + bar + '</div>' +
+  return '<div class="playout"><div class="stack"><div class="card"><h3>Formazione tipo · 4-4-2</h3><div class="plabel">Il numero è: l’overall</div>' + P.field + note +
+    G.ui.pitchLegend('le presenze, rispetto al compagno che ne ha di più') + bar + '</div>' +
     '<div class="card"><h3>Panchina · ' + x.o.bench.length + '</h3>' + P.bench + '</div></div>' +
     '<div class="card pside"><h3>' + (info ? 'Giocatore' : 'Formazione tipo') + '</h3>' + (info || '<p class="muted small">Tocca un giocatore per vedere i suoi numeri. La barra in basso sulle carte sono le presenze rispetto al compagno che ne ha di più.</p>') + '</div></div>';
 };
 
 // Esc cancels the selection
-document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && G.ui.sel.mx && G.state) { G.ui.sel.mx = null; G.ui.render(); } });
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && G.ui.sel.mx && G.state) { G.ui.sel.mx = null; G.ui.sel.pmode = null; G.ui.sel.ask = null; G.ui.render(); } });

@@ -13,9 +13,9 @@ G.mgrLive.now = function (st) { var S = st.S; return S && S.cur ? S.year + ':' +
 // The managed club's match on the next day of the block, with a club as opponent
 /** @param {State} st @returns {{ opp: ClubId, home: boolean, neutral: boolean, key: string }|null} */
 G.mgrLive.ahead = function (st) {
-  var S = st.S, cur = S.cur, x = cur && cur.days ? cur.days[cur.d] : undefined;
-  if (x === undefined || cur.b > 4) return null;
-  var e = G.cal.matchOn(st, st.mgr.club, x);
+  var S = G.sure(st.S), cur = S.cur, x = cur && cur.days ? cur.days[cur.d] : undefined;
+  if (!cur || x === undefined || cur.b > 4) return null;
+  var e = G.cal.matchOn(st, G.mgr.job(st).club, x);
   if (!e || typeof e.opp !== 'number') return null;
   return { opp: e.opp, home: !!e.home, neutral: e.rd === 'Finale', key: G.mgrLive.now(st) };
 };
@@ -31,15 +31,16 @@ G.mgrLive.goals = function (H, mods, dstr, part, rng) {
 // Before the day of our match, when the user asked for it: the first half, then the half-time modal
 /** @param {State} st @returns {boolean} true = stop here */
 G.mgrLive.stop = function (st) {
-  var S = st.S;
+  var S = G.sure(st.S);
   if (!st.mgr || !G.mgr.active(st) || !st.live || !st.mgrLiveReq || st.event || !S.cur || S.cur.b > 4) return false;
   var A = G.mgrLive.ahead(st);
   if (!A || (st.mgrHT && st.mgrHT.key === A.key)) return false;
-  var Lc = G.CFG2.MGR_LIVE, W = st.world, m = st.mgr, club = W.clubs[m.club], opp = W.clubs[A.opp];
+  var Lc = G.CFG2.MGR_LIVE, W = st.world, m = G.mgr.job(st), club = W.clubs[m.club], opp = W.clubs[A.opp];
   // the opponent as G.match.play fields it: its XI with the usual rotation (club.str already holds the coach)
+  G.mgrTac.beforeMatch(st, A.opp);  // tactical familiarity (M9 S6), before the XI's strength
   var /** @type {HalfTime} */ H = { key: A.key, opp: A.opp, home: A.home, ht: [0, 0], my: G.mgrTeam.side(st, club).str, op: G.match.side(W, opp, null, st.player, G.rng).str, pick: null };
   if (A.neutral) H.neutral = true;
-  H.ht = G.mgrLive.goals(H, G.mgrTeam.mods(m), 0, Lc.HALF1, G.rng);
+  H.ht = G.mgrLive.goals(H, G.mgrTeam.mods(m, W, A.opp), 0, Lc.HALF1, G.rng);
   st.mgrHT = H;
   var names = A.home ? [club.name, opp.name] : [opp.name, club.name], sc = A.home ? H.ht : [H.ht[1], H.ht[0]];
   var how = H.ht[0] < H.ht[1] ? 'Primo tempo difficile: siete sotto.' : H.ht[0] > H.ht[1] ? 'Primo tempo buono: siete in vantaggio.' : 'Primo tempo in equilibrio.';
@@ -55,8 +56,8 @@ G.mgrLive.num = function (x) { var r = Math.round(x * 10) / 10; return (r >= 0 ?
 // The 4 answers at half time, each saying what it changes (same order on the modal and in pick)
 /** @param {State} st @param {HalfTime} H @returns {{ label: string, pick: LivePick, p?: number }[]} */
 G.mgrLive.options = function (st, H) {
-  var Lc = G.CFG2.MGR_LIVE, m = st.mgr, W = st.world, club = W.clubs[m.club], T = G.mgrTeam, base = T.mods(m);
-  var mk = /** @param {number[]} d @param {number} dstr @param {[PlayerId, PlayerId]} sub @param {string} txt @returns {LivePick} */ function (d, dstr, sub, txt) {
+  var Lc = G.CFG2.MGR_LIVE, m = G.mgr.job(st), W = st.world, club = W.clubs[m.club], T = G.mgrTeam, base = T.mods(m, W, H.opp);
+  var mk = /** @param {number[]} d @param {number} dstr @param {[PlayerId, PlayerId]|null} sub @param {string} txt @returns {LivePick} */ function (d, dstr, sub, txt) {
     return { mods: [base[0] + d[0], base[1] + d[1]], dstr: dstr, sub: sub, talk: null, txt: txt };
   };
   var pct = /** @param {number} x */ function (x) { return Math.round(Math.abs(x) * 100) + '%'; };
@@ -65,17 +66,18 @@ G.mgrLive.options = function (st, H) {
     behind ? { label: '⚔️ Tutti all’attacco · più gol fatti (+' + pct(tac[0]) + ') e più gol presi (+' + pct(tac[1]) + ')', pick: mk(tac, 0, null, 'tutti all’attacco') } :
       { label: '🛡️ Chiudiamoci · meno gol presi (−' + pct(tac[1]) + ') e meno gol fatti (−' + pct(tac[0]) + ')', pick: mk(tac, 0, null, 'chiusi in difesa') }];
   // the substitution: the tiredest outfield starter (the weakest at equal fitness) for the best healthy reserve in his slot
-  var xi = T.xi(st), /** @type {Dict<number>} */ inXi = {}, /** @type {XiSlot} */ y = null;
+  var xi = T.xi(st), /** @type {Dict<number>} */ inXi = {}, /** @type {XiSlot|null} */ y0 = null;
   xi.forEach(function (x) { inXi[x.id] = 1; });
   var key = /** @param {XiSlot} x */ function (x) { return T.cond(m, x.id) * 1000 + T.eff(m, W.players[x.id], x.r); };
-  xi.forEach(function (x) { if (x.r !== 'POR' && (!y || key(x) < key(y))) y = x; });
-  var /** @type {Npc} */ on = null, best = -1e9;
-  if (y) club.sq.forEach(function (id) {
+  xi.forEach(function (x) { if (x.r !== 'POR' && (!y0 || key(x) < key(y0))) y0 = x; });
+  var y = /** @type {XiSlot|null} */ (y0), /** @type {Npc|null} */ on0 = null, best = -1e9;  // both filled in callbacks
+  if (y) { var slot = y; club.sq.forEach(function (id) {
     if (inXi[id] || G.mgrSq.inj(m, id)) return;
-    var v = T.eff(m, W.players[id], y.r);
-    if (v > best) { best = v; on = W.players[id]; }
-  });
-  if (on) {
+    var v = T.eff(m, W.players[id], slot.r);
+    if (v > best) { best = v; on0 = W.players[id]; }
+  }); }
+  var on = /** @type {Npc|null} */ (on0);
+  if (on && y) {
     var off = W.players[y.id], d = (best - T.eff(m, off, y.r)) / 11;
     out.push({ label: '🔄 Cambio: dentro ' + on.n + ' per ' + off.n + ' (condizione ' + T.cond(m, off.i) + '%) · ' + G.mgrLive.num(d) + ' di forza', pick: mk([0, 0], d, [on.i, off.i], 'dentro ' + on.n + ' per ' + off.n) });
   } else out.push({ label: '🔄 Nessuna riserva disponibile per un cambio', pick: mk([0, 0], 0, null, 'nessun cambio') });
@@ -87,7 +89,7 @@ G.mgrLive.options = function (st, H) {
 // The answer: the talk is settled now, the rest when the second half is played
 /** @param {State} st @param {number|string} i */
 G.mgrLive.pick = function (st, i) {
-  var Lc = G.CFG2.MGR_LIVE, H = st.mgrHT, m = st.mgr;
+  var Lc = G.CFG2.MGR_LIVE, H = st.mgrHT, m = G.mgr.job(st);
   st.event = null;
   if (!H || !G.mgr.active(st)) return;
   var opts = G.mgrLive.options(st, H), o = opts[+i || 0] || opts[0], P = o.pick;
@@ -109,16 +111,17 @@ G.mgrLive.today = function (st, mg, h, a) {
 // The result: the first half plus the second with the choice; [home, away]. A substitute comes on first
 /** @param {State} st @param {HalfTime} H @param {boolean} home @param {MatchSide} side @returns {number[]} */
 G.mgrLive.result = function (st, H, home, side) {
-  var P = H.pick || { mods: /** @type {[number, number]} */ (G.mgrTeam.mods(st.mgr)), dstr: 0, sub: null, talk: null };
+  var P = H.pick || { mods: /** @type {[number, number]} */ (G.mgrTeam.mods(G.mgr.job(st), st.world, H.opp)), dstr: 0, sub: null, talk: null };
   var r2 = G.mgrLive.goals(H, P.mods, P.dstr, 1 - G.CFG2.MGR_LIVE.HALF1, G.rng), ours = H.ht[0] + r2[0], theirs = H.ht[1] + r2[1];
-  if (P.sub) { side.sub = P.sub; side.cameOn = [P.sub[0]].concat(side.cameOn.filter(function (id) { return id !== P.sub[0]; })).slice(0, G.CFG.SUBS); }
+  var sub = P.sub;
+  if (sub) { var in1 = sub[0]; side.sub = sub; side.cameOn = [in1].concat(side.cameOn.filter(function (id) { return id !== in1; })).slice(0, G.CFG.SUBS); }
   return home ? [ours, theirs] : [theirs, ours];
 };
 
 // After the match: the row and the news say how it went
 /** @param {State} st @param {HalfTime} H @param {number[]} res @param {boolean} home */
 G.mgrLive.done = function (st, H, res, home) {
-  var S = st.S, row = S.blockRows[S.blockRows.length - 1], txt = H.pick && H.pick.txt ? H.pick.txt : 'nessun cambio', f = home ? res : [res[1], res[0]];
+  var S = G.sure(st.S), row = S.blockRows[S.blockRows.length - 1], txt = H.pick && H.pick.txt ? H.pick.txt : 'nessun cambio', f = home ? res : [res[1], res[0]];
   if (row && row.mgr && row.opp === H.opp) { row.live = 1; row.ht = H.ht.slice(); row.lv = txt; }
   G.news(st, '⏱️ In diretta contro ' + st.world.clubs[H.opp].name + ': ' + H.ht[0] + '-' + H.ht[1] + ' all’intervallo, poi ' + txt + ', finisce ' + f[0] + '-' + f[1]);
   st.mgrHT = null;

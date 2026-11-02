@@ -62,7 +62,7 @@ G.life.moraleBonus = function (st) {
 /** @param {State} st @param {BlockSum} sum */
 G.life.block = function (st, sum) {
   var C = G.CFG, p = st.player, ag = G.life.agent(p), club = st.world.clubs[p.clubId];
-  var gross = p.contract.wage * C.WEEKS_PER_BLOCK;
+  var gross = G.sure(p.contract).wage * C.WEEKS_PER_BLOCK;
   var net = gross * (1 - C.TAX) * (1 - (ag ? ag.fee / 100 : 0));
   p.money = Math.round(p.money + net + (G.life.income(p) - G.life.staffCost(p)) / 4);
   if (p.money < 0 && G.life.staffCost(p) > 0) {
@@ -71,7 +71,7 @@ G.life.block = function (st, sum) {
   }
   // Fame drifts toward a target set by level, club and honours; performances and PR push it around
   var target = G.clamp((p.ovr - 55) * 1.5 + (club.rep - 65) * 0.8 + p.awards.reduce(function (s, a) { return s + (a.w || 3); }, 0) + p.trophies.length, 0, 100);
-  var dFame = (target - p.fame) * 0.15 + (sum.avg ? (sum.avg - 6.6) * 0.6 : -0.2) + sum.goals * 0.05 + G.life.staff(p, 'pr');
+  var dFame = (target - p.fame) * 0.15 + (sum.avg ? (sum.avg - 6.6) * 0.6 : -0.2) + sum.goals * 0.05 * G.pos.fameX(p) + G.life.staff(p, 'pr');  // attacking positions: more fame per goal (M9 S5)
   G.life.fame(st, dFame);
   var fd = sum.apps * 0.12 + sum.goals * 0.25 + (sum.avg ? (sum.avg - 6.5) : 0);
   G.life.fans(st, p.clubId, fd > 0 && p.captain === p.clubId ? fd * C.CAPTAIN.FANS : fd);
@@ -155,7 +155,7 @@ G.life.buy = function (st, key) {
   var p = st.player, it = G.SHOP.items[key];
   if (p.money < it.c || (it.once && p.items[key]) || (it.season && p.items.charityYear) || p.fame < (it.req || 0)) return false;
   p.money -= it.c; p.morale = Math.min(100, p.morale + it.mo); G.life.fame(st, it.fa);
-  if (it.fans) Object.keys(p.fans).forEach(function (c) { G.life.fans(st, +c, it.fans); });
+  if (it.fans) { var love = it.fans; Object.keys(p.fans).forEach(function (c) { G.life.fans(st, +c, love); }); }
   if (it.season) p.items.charityYear = 1;
   else p.items[key] = 1;
   G.news(st, '🛍️ ' + it.n);

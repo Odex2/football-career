@@ -30,7 +30,7 @@ interface AchTotals {
   hist: SeasonRecord[]; leagueTitles: number; teenGoals: number;
 }
 /** [id, icon, name, description, check] */
-type AchDef = [string, string, string, string, (A: AchTotals) => any];
+type AchDef = [string, string, string, string, (A: AchTotals) => unknown];
 
 // ---- Hall of Fame (js/hof.js): the score of a career and the entries kept in localStorage
 interface HofScore { total: number; parts: Dict<number>; grade: string; icon: string }
@@ -53,7 +53,7 @@ interface PlayerRecap {
 
 /** options of the balancing simulations (js/debug.js) */
 interface DebugOpts {
-  nat?: NationCode; role?: RoleKey; seed?: number; plan?: { focus?: string; intensity?: number };
+  nat?: NationCode; role?: RoleKey; pos?: string; seed?: number; plan?: { focus?: string; intensity?: number };
   at?: number; retireAge?: number; stopAge?: number; verbose?: boolean; n?: number; [k: string]: any;
 }
 /** the manager's end-of-season recap (G.mgr.seasonEnd) */

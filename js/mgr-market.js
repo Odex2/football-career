@@ -7,16 +7,16 @@ G.mgr.open = function (st) { var S = st.S; return !!S && !S.cur && (S.block === 
 
 /** @param {State} st @param {Npc} pl @returns {number} */
 G.mgr.price = function (st, pl) {
-  var W = st.world, club = W.clubs[st.mgr.club], s = pl.c >= 0 ? W.clubs[pl.c] : null;
+  var W = st.world, club = W.clubs[G.mgr.job(st).club], s = pl.c >= 0 ? W.clubs[pl.c] : null;
   return s ? Math.round(G.squads.value(pl.o, pl.a, pl.p) * (pl.y <= 1 ? 0.6 : 1) * (s.rep > club.rep ? 1.1 : 1) * G.CFG.MGR.PRICE * 10) / 10 : 0;
 };
 /** @param {State} st @param {Npc} pl @returns {number} */
-G.mgr.wageFor = function (st, pl) { return Math.round(Math.max(pl.w, G.squads.wage(pl.o, st.world.clubs[st.mgr.club])) * 1.1); };
+G.mgr.wageFor = function (st, pl) { return Math.round(Math.max(pl.w, G.squads.wage(pl.o, st.world.clubs[G.mgr.job(st).club])) * 1.1); };
 
 // Shortlist of players who would improve the XI and the club can afford, refreshed each window
 /** @param {State} st @returns {Npc[]} */
 G.mgr.targets = function (st) {
-  var m = st.mgr, W = st.world, club = W.clubs[m.club], key = st.S.year + ':' + st.S.block;
+  var m = G.mgr.job(st), W = st.world, club = W.clubs[m.club], key = G.sure(st.S).year + ':' + G.sure(st.S).block;
   if (!m.tg || m.tgKey !== key) {
     var bk = G.transfers.buckets(W), /** @type {{ id: PlayerId, r: RoleKey, sc: number }[]} */ out = [];
     G.ROLE_KEYS.forEach(function (r) {
@@ -40,9 +40,10 @@ G.mgr.targets = function (st) {
 // The signing at the end of a negotiation (js/mgr-deal.js): fee, wage (k€ a week) and years agreed
 /** @param {State} st @param {Npc} pl @param {number} fee @param {number} wage @param {number} years */
 G.mgr.buy = function (st, pl, fee, wage, years) {
-  var m = st.mgr;
+  var m = G.mgr.job(st);
   G.transfers.move(st, pl, st.world.clubs[m.club], fee, wage);
   pl.y = years;
+  G.mgrId.bought(st, pl);
   if (m.tg) m.tg = m.tg.filter(function (x) { return x !== pl.i; });
   G.season.refresh(st);
 };
@@ -50,7 +51,7 @@ G.mgr.buy = function (st, pl, fee, wage, years) {
 // "Vendi subito": at once, 10% under his value, to the best club that can take him
 /** @param {State} st @param {PlayerId} id @returns {string} */
 G.mgr.sell = function (st, id) {
-  var C = G.CFG, m = st.mgr, W = st.world, club = W.clubs[m.club], pl = W.players[id];
+  var C = G.CFG, m = G.mgr.job(st), W = st.world, club = W.clubs[m.club], pl = W.players[id];
   if (!G.mgr.open(st) || !pl || pl.c !== club.id) return 'chiuso';
   if (pl.ln !== undefined) return 'prestito';
   if (club.sq.length <= C.SQUAD_MIN) return 'rosa';
@@ -60,4 +61,19 @@ G.mgr.sell = function (st, id) {
   if (!buyers.length) return 'nessuno';
   G.mgrDeal.sell(st, pl, G.rng.pick(buyers), price);
   return 'ok';
+};
+
+// The managed club can always do something on the market (M9, fix after S2): a floor for the budget and the wage
+// room when the manager signs and every summer (G.CFG2.MGR_FLOOR). Only the managed club: the NPC world is the same
+/** @param {State} st */
+G.mgr.marketFloor = function (st) {
+  var F = G.CFG2.MGR_FLOOR, m = G.mgr.job(st), W = st.world, club = W.clubs[m.club], tier = G.leagueByKey(club.lg).tier;
+  // the wage a player at the squad’s level asks (the upper quartile of up to 40 of them, M€ a year)
+  var asks = W.players.filter(function (pl) { return pl && pl.c >= 0 && pl.c !== club.id && pl.o >= club.str - 2 && pl.o <= club.str + F.LEVEL; }).slice(0, 40)
+    .map(function (pl) { return G.mgrDeal.wage(st, pl, 1); }).sort(function (a, b) { return a - b; });
+  var wage = (asks.length ? asks[Math.floor(asks.length * 0.75)] : G.squads.wage(club.str, club)) * 52 / 1000;
+  var bud = Math.round(Math.max(club.rev * F.REV, F.ABS[Math.min(tier, F.ABS.length) - 1]) * 10) / 10;
+  if (club.bud < bud) club.bud = bud;
+  var room = G.world.wageCap(club) * 1.3 - G.world.wageBill(W, club) + (m.wageRoom || 0), need = wage * F.ROOM;
+  if (room < need) m.wageRoom = Math.round(((m.wageRoom || 0) + need - room) * 100) / 100;
 };

@@ -8,7 +8,7 @@
 // A window opens (G.mgr.seasonStart, the end of block 1): its state starts again, the other clubs make their offers
 /** @param {State} st */
 G.mgrDeal.window = function (st) {
-  var m = st.mgr;
+  var m = G.mgr.job(st);
   if (!G.mgr.active(st)) return;
   if (!m.neg) G.mgrDeal.start(st);
   m.rep2 = {}; m.neg = {}; m.bids = []; m.deal = null;
@@ -25,14 +25,14 @@ G.mgrDeal.close = function (st) {
   if (!m || !m.loans) return;
   if (m.assist && m.assist.market && G.mgr.open(st)) G.mgrDeal.autoBuy(st);
   m.bids = []; m.deal = null;
-  if (st.S.block === 0) G.mgrDeal.lapse(st, true);
+  if (G.sure(st.S).block === 0) G.mgrDeal.lapse(st, true);
 };
 
 // Options on players taken on loan, back at their club: they lapse when the window closes (all) or when they can
 // no longer be used (the manager left that club, the player moved on)
 /** @param {State} st @param {boolean} all */
 G.mgrDeal.lapse = function (st, all) {
-  var m = st.mgr, W = st.world;
+  var m = G.mgr.job(st), W = st.world;
   Object.keys(m.loans || {}).forEach(function (k) {
     var id = +k, L = m.loans[id], pl = W.players[id];
     if (L.opt === undefined || (pl && pl.c === L.to)) return;
@@ -48,7 +48,7 @@ G.mgrDeal.lapse = function (st, all) {
 // contracts are left to the manager (D4): G.squads.yearEnd lets go who was not renewed
 /** @param {State} st @returns {ClubId|undefined} */
 G.mgrDeal.seasonEnd = function (st) {
-  var D = G.CFG2.MGR_DEAL, m = st.mgr, W = st.world, act = G.mgr.active(st);
+  var D = G.CFG2.MGR_DEAL, m = G.mgr.job(st), W = st.world, act = G.mgr.active(st);
   Object.keys(m.loans || {}).forEach(function (k) {
     var id = +k, L = m.loans[id], pl = W.players[id];
     if (!pl || pl.ln === undefined) { if (pl) delete pl.ln; delete m.loans[id]; return; }
@@ -74,8 +74,8 @@ G.mgrDeal.seasonEnd = function (st) {
 // so the season plays the same with or without them
 /** @param {State} st */
 G.mgrDeal.makeBids = function (st) {
-  var D = G.CFG2.MGR_DEAL, m = st.mgr, W = st.world, club = W.clubs[m.club];
-  var rng = G.makeRng(G.mgrDeal.hash('bids:' + st.seed + ':' + st.S.year + ':' + st.S.block + ':' + m.club));
+  var D = G.CFG2.MGR_DEAL, m = G.mgr.job(st), W = st.world, club = W.clubs[m.club];
+  var rng = G.makeRng(G.mgrDeal.hash('bids:' + st.seed + ':' + G.sure(st.S).year + ':' + G.sure(st.S).block + ':' + m.club));
   var mine = club.sq.filter(function (id) { return W.players[id].ln === undefined; });
   var listed = mine.filter(function (id) { return m.list[id]; });
   var top = mine.slice().sort(function (a, b) { return W.players[b].o - W.players[a].o || a - b; }).slice(0, 6);
@@ -93,13 +93,14 @@ G.mgrDeal.makeBids = function (st) {
   }
 };
 
-/** @param {Mgr} m @param {PlayerId} id @returns {boolean} he asked to leave (a request, or listed on his request) */
+/** @param {MgrJob} m @param {PlayerId} id @returns {boolean} he asked to leave (a request, or listed on his request) */
 G.mgrDeal.wantsOut = function (m, id) { return m.list[id] === 1 || m.req.some(function (r) { return r.id === id && r.k === 'via'; }); };
 
 // A sale to club `to` for fee: the offers for him go, the squad's maps follow
 /** @param {State} st @param {Npc} pl @param {Club} to @param {number} fee */
 G.mgrDeal.sell = function (st, pl, to, fee) {
-  var m = st.mgr;
+  var m = G.mgr.job(st);
+  G.mgrId.sold(st, pl);
   G.transfers.move(st, pl, to, fee, Math.round(Math.max(pl.w, G.squads.wage(pl.o, to))));
   m.bids = m.bids.filter(function (b) { return b.id !== pl.i; });
   if (m.cond) delete m.cond[pl.i];
@@ -109,7 +110,7 @@ G.mgrDeal.sell = function (st, pl, to, fee) {
 // The answer to offer i: 'si' sells, 'no' turns it down (who wanted to leave takes it badly), 'su' asks 15% more
 /** @param {State} st @param {number} i @param {string} opt @returns {string} */
 G.mgrDeal.bid = function (st, i, opt) {
-  var D = G.CFG2.MGR_DEAL, m = st.mgr, W = st.world, club = W.clubs[m.club], b = m.bids[i];
+  var D = G.CFG2.MGR_DEAL, m = G.mgr.job(st), W = st.world, club = W.clubs[m.club], b = m.bids[i];
   if (!b || !G.mgr.open(st)) return '';
   var pl = W.players[b.id], by = W.clubs[b.by];
   if (!pl || pl.c !== club.id) { m.bids.splice(i, 1); return ''; }
@@ -131,7 +132,7 @@ G.mgrDeal.bid = function (st, i, opt) {
 // The automatic answer: sell for at least 1.2 times his value unless he is a key player, otherwise no
 /** @param {State} st */
 G.mgrDeal.autoBids = function (st) {
-  var m = st.mgr, W = st.world;
+  var m = G.mgr.job(st), W = st.world;
   m.bids.slice().forEach(function (b) {
     var i = m.bids.indexOf(b), pl = W.players[b.id];
     if (i < 0 || !pl) return;
@@ -145,7 +146,7 @@ G.mgrDeal.autoBids = function (st) {
 // would get (G.mgrDeal.quick); if his club or he says no, the next one
 /** @param {State} st */
 G.mgrDeal.autoBuy = function (st) {
-  var D = G.CFG2.MGR_DEAL, m = st.mgr, W = st.world, str = W.clubs[m.club].str;
+  var D = G.CFG2.MGR_DEAL, m = G.mgr.job(st), W = st.world, str = W.clubs[m.club].str;
   G.mgrTeam.xi(st).slice().forEach(function (x) {
     var old = W.players[x.id];
     if (!old || old.o > str - D.AUTO_GAP) return;
@@ -161,7 +162,7 @@ G.mgrDeal.autoBuy = function (st) {
 // On or off the transfer list; listing a player who did not ask costs him 10 of morale
 /** @param {State} st @param {PlayerId} id @returns {string} */
 G.mgrDeal.setList = function (st, id) {
-  var m = st.mgr, pl = st.world.players[id];
+  var m = G.mgr.job(st), pl = st.world.players[id];
   if (!pl || pl.c !== m.club || pl.ln !== undefined) return '';
   if (m.list[id]) { delete m.list[id]; return '📋 ' + pl.n + ' non è più sul mercato.'; }
   if (m.req.some(function (r) { return r.id === id && r.k === 'via'; })) return G.mgrSq.answer(st, id, 'ok');
@@ -171,17 +172,17 @@ G.mgrDeal.setList = function (st, id) {
 
 // ---------- D4 · renewals ----------
 /** @param {State} st @param {Npc} pl @returns {boolean} */
-G.mgrDeal.canRenew = function (st, pl) { return !!pl && pl.c === st.mgr.club && pl.ln === undefined && pl.y <= 2 && pl.a < 36 && st.S.block <= 4; };
+G.mgrDeal.canRenew = function (st, pl) { return !!pl && pl.c === G.mgr.job(st).club && pl.ln === undefined && pl.y <= 2 && pl.a < 36 && G.sure(st.S).block <= 4; };
 /** @param {State} st @param {PlayerId} id @returns {{ wage: number, p: number }} the wage he asks and the chance he signs */
 G.mgrDeal.renewAsk = function (st, id) {
-  var m = st.mgr, W = st.world, pl = W.players[id], pm = G.mgrSq.pm(m, id);
+  var m = G.mgr.job(st), W = st.world, pl = W.players[id], pm = G.mgrSq.pm(m, id);
   var wage = Math.round(Math.max(pl.w, G.squads.wage(pl.o, W.clubs[m.club])) * (m.sr[id] === 'cru' || m.sr[id] === 'imp' ? 1.1 : 1));
   return { wage: wage, p: pm < 30 ? 0 : G.clamp(G.CFG2.MGR_DEAL.RENEW_P + (pm - 60) / 100, 0.05, 0.95) };
 };
 // A renewal for yrs more seasons after this one; one try a window
 /** @param {State} st @param {PlayerId} id @param {number} yrs @returns {string} */
 G.mgrDeal.renew = function (st, id, yrs) {
-  var m = st.mgr, S = st.S, pl = st.world.players[id];
+  var m = G.mgr.job(st), S = G.sure(st.S), pl = st.world.players[id];
   if (!G.mgrDeal.canRenew(st, pl)) return '';
   if (m.neg[id]) return pl.n + ' ha già detto no: riprova nella prossima finestra di mercato.';
   var a = G.mgrDeal.renewAsk(st, id);
@@ -194,27 +195,27 @@ G.mgrDeal.renew = function (st, id, yrs) {
 /** @param {State} st @returns {number} contracts that end in June */
 G.mgrDeal.expiring = function (st) {
   var W = st.world;
-  return W.clubs[st.mgr.club].sq.filter(function (id) { return W.players[id].y <= 1 && W.players[id].ln === undefined; }).length;
+  return W.clubs[G.mgr.job(st).club].sq.filter(function (id) { return W.players[id].y <= 1 && W.players[id].ln === undefined; }).length;
 };
 
 // ---------- D5 · loans ----------
 // Who can go on loan now: 21 or younger and not among the 16 who start most
 /** @param {State} st @returns {PlayerId[]} */
 G.mgrDeal.loanOuts = function (st) {
-  var m = st.mgr, W = st.world, club = W.clubs[m.club];
+  var m = G.mgr.job(st), W = st.world, club = W.clubs[m.club];
   if (!G.mgr.open(st)) return [];
   var top = club.sq.slice().sort(function (a, b) { return (m.starts[b] || 0) - (m.starts[a] || 0) || W.players[b].o - W.players[a].o; }).slice(0, 16);
   return club.sq.filter(function (id) { return W.players[id].a <= 21 && top.indexOf(id) < 0 && W.players[id].ln === undefined; });
 };
 /** @param {State} st @returns {PlayerId[]} our players away on loan */
 G.mgrDeal.away = function (st) {
-  var m = st.mgr, W = st.world;
+  var m = G.mgr.job(st), W = st.world;
   return Object.keys(m.loans || {}).map(Number).filter(function (id) { var pl = W.players[id]; return pl && pl.ln === m.club && pl.c === m.loans[id].to; });
 };
 // A loan out to a club of about his level with room, from the lowest division
 /** @param {State} st @param {PlayerId} id @returns {string} */
 G.mgrDeal.loanOut = function (st, id) {
-  var D = G.CFG2.MGR_DEAL, m = st.mgr, W = st.world, club = W.clubs[m.club], pl = W.players[id];
+  var D = G.CFG2.MGR_DEAL, m = G.mgr.job(st), W = st.world, club = W.clubs[m.club], pl = W.players[id];
   if (G.mgrDeal.loanOuts(st).indexOf(id) < 0) return '';
   if (G.mgrDeal.away(st).length >= D.LOAN_MAX) return 'Hai già ' + D.LOAN_MAX + ' giocatori in prestito.';
   if (club.sq.length <= G.CFG.SQUAD_MIN) return 'La rosa è già al minimo.';
@@ -222,7 +223,7 @@ G.mgrDeal.loanOut = function (st, id) {
     .sort(function (a, b) { return G.leagueByKey(b.lg).tier - G.leagueByKey(a.lg).tier || Math.abs(a.str - pl.o) - Math.abs(b.str - pl.o) || a.id - b.id; })[0];
   if (!to) return 'Nessun club adatto lo vuole in prestito.';
   club.sq.splice(club.sq.indexOf(id), 1); to.sq.push(id); pl.c = to.id; pl.ln = club.id;
-  m.loans[id] = { to: to.id, y: st.S.year };
+  m.loans[id] = { to: to.id, y: G.sure(st.S).year };
   G.mgrSq.sync(st); G.season.refresh(st);
   var t = '🔁 ' + pl.n + ' va in prestito al ' + to.name;
   G.news(st, t);
@@ -231,17 +232,17 @@ G.mgrDeal.loanOut = function (st, id) {
 // A loan in (D2): the player joins us now, his club keeps him; the option is his full price of today
 /** @param {State} st @param {Npc} pl @param {number} fee @param {number} wage */
 G.mgrDeal.loanIn = function (st, pl, fee, wage) {
-  var m = st.mgr, W = st.world, club = W.clubs[m.club], from = W.clubs[pl.c], opt = G.mgr.price(st, pl);
+  var m = G.mgr.job(st), W = st.world, club = W.clubs[m.club], from = W.clubs[pl.c], opt = G.mgr.price(st, pl);
   from.sq.splice(from.sq.indexOf(pl.i), 1); club.sq.push(pl.i);
   from.bud += fee; club.bud -= fee; pl.c = club.id; pl.ln = from.id; pl.w = wage;
-  m.loans[pl.i] = { to: club.id, y: st.S.year, opt: opt };
+  m.loans[pl.i] = { to: club.id, y: G.sure(st.S).year, opt: opt };
   G.news(st, '🔁 ' + pl.n + ' arriva in prestito dal ' + from.name + ' (riscatto ' + opt + ' M€)');
   G.season.refresh(st);
 };
 // The option in the summer window: yes buys him at the agreed fee (it does not count as a buy of the window)
 /** @param {State} st @param {PlayerId} id @param {boolean} yes @returns {string} */
 G.mgrDeal.option = function (st, id, yes) {
-  var m = st.mgr, W = st.world, club = W.clubs[m.club], L = m.loans[id], pl = W.players[id];
+  var m = G.mgr.job(st), W = st.world, club = W.clubs[m.club], L = m.loans[id], pl = W.players[id];
   if (!L || L.opt === undefined || !pl || pl.c !== pl.ln || !G.mgr.open(st)) return '';
   var home = W.clubs[pl.c];
   if (!yes) { delete pl.ln; delete m.loans[id]; return '↩️ ' + pl.n + ' resta al ' + home.name + '.'; }
@@ -257,14 +258,14 @@ G.mgrDeal.option = function (st, id, yes) {
 // ---------- D6 · budget and wages ----------
 /** @param {State} st @returns {number} M€ a year the wage bill can still grow */
 G.mgrDeal.margin = function (st) {
-  var m = st.mgr, W = st.world, club = W.clubs[m.club];
+  var m = G.mgr.job(st), W = st.world, club = W.clubs[m.club];
   return G.world.wageCap(club) * 1.3 + (m.wageRoom || 0) - G.world.wageBill(W, club);
 };
 // x % of the budget moved to wages (x > 0), or x % of the wage cap back to the budget (x < 0, within the free
 // margin). The old split is undone first, as far as the wages signed since allow
 /** @param {State} st @param {number} x @returns {string} */
 G.mgrDeal.setSplit = function (st, x) {
-  var D = G.CFG2.MGR_DEAL, m = st.mgr, club = st.world.clubs[m.club], r1 = G.mgrDeal.r1;
+  var D = G.CFG2.MGR_DEAL, m = G.mgr.job(st), club = st.world.clubs[m.club], r1 = G.mgrDeal.r1;
   if (!G.mgr.open(st) || D.SPLIT.indexOf(x) < 0 || x === (m.split || 0)) return '';
   var room = m.wageRoom || 0, back = room > 0 ? Math.min(room, Math.max(0, G.mgrDeal.margin(st))) : -Math.min(-room, Math.max(0, club.bud));
   club.bud = r1(club.bud + back); m.wageRoom = r1(room - back);
@@ -275,4 +276,4 @@ G.mgrDeal.setSplit = function (st, x) {
 
 // Saves from before phase D
 /** @param {State} st */
-G.mgrDeal.migrate = function (st) { if (G.mgr.active(st) && !st.mgr.neg) G.mgrDeal.start(st); };
+G.mgrDeal.migrate = function (st) { if (G.mgr.active(st) && !G.mgr.job(st).neg) G.mgrDeal.start(st); };

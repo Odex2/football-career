@@ -18,19 +18,19 @@ G.contracts.bonusFor = function (wage) {
 };
 
 // Contracts from older saves get a clause and no bonuses
-/** @param {State} st @returns {Contract} */
+/** @param {State} st @returns {FullContract|null} */
 G.contracts.ensure = function (st) {
   var c = st.player.contract;
   if (c && c.clause === undefined) { c.clause = Math.round(Math.max(1, G.transfers.value(st.player)) * 2 * 10) / 10; c.bonus = { g: 0, a: 0, t: 0 }; }
-  return c;
+  return /** @type {FullContract|null} */ (c);
 };
 
 // Negotiation: a lower clause or bigger bonuses
 /** @param {State} st @param {Offer} o @param {string} kind */
 G.contracts.raise = function (st, o, kind) {
-  var K = G.CFG.CLAUSE;
-  if (kind === 'clause') o.clause = Math.max(Math.round(G.transfers.value(st.player) * K.MIN * 10) / 10, Math.round(o.clause * (1 - K.CUT) * 10) / 10);
-  if (kind === 'bonus') /** @type {('g'|'a'|'t')[]} */ (['g', 'a', 't']).forEach(function (k) { o.bonus[k] = Math.round(o.bonus[k] * (1 + G.CFG.BONUS.UP)); });
+  var K = G.CFG.CLAUSE, b = G.sure(o.bonus);  // offers made since the clauses came in have both
+  if (kind === 'clause') o.clause = Math.max(Math.round(G.transfers.value(st.player) * K.MIN * 10) / 10, Math.round(G.sure(o.clause) * (1 - K.CUT) * 10) / 10);
+  if (kind === 'bonus') /** @type {('g'|'a'|'t')[]} */ (['g', 'a', 't']).forEach(function (k) { b[k] = Math.round(b[k] * (1 + G.CFG.BONUS.UP)); });
 };
 
 // A transfer bid while under contract: the buyer pays the clause when it is close to the fee,
@@ -47,7 +47,7 @@ G.contracts.checkBid = function (st, o) {
 /** @param {State} st @param {number} id @returns {string|null} */
 G.contracts.payClause = function (st, id) {
   var p = st.player, o = G.transfers.find(st, id), c = G.contracts.ensure(st), ag = G.life.agent(p);
-  if (!o || !o.blocked || o.tried) return null;
+  if (!o || !o.blocked || o.tried || !c) return null;
   var buyer = st.world.clubs[o.club], value = Math.max(1, G.transfers.value(p));
   var pr = G.clamp(buyer.bud / c.clause, 0, 1) * G.clamp(value * 1.6 / c.clause, 0.1, 1) + (ag ? ag.s * 0.04 : 0);
   o.tried = 1;
@@ -80,9 +80,9 @@ G.contracts.seasonBonus = function (st, rec) {
   return net;
 };
 
-/** @param {Contract} c */
+/** @param {Contract|null} c */
 G.contracts.text = function (c) {
   if (!c || c.clause === undefined) return '';
-  var b = c.bonus || /** @type {Contract['bonus']} */ ({});
+  var b = c.bonus || /** @type {ContractBonus} */ ({});
   return 'Clausola ' + c.clause + ' M€' + (b.g || b.a || b.t ? ' · bonus ' + b.g + ' k€/gol, ' + b.a + ' k€/presenza, ' + b.t + ' k€/trofeo' : '');
 };

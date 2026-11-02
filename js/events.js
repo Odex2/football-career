@@ -50,7 +50,7 @@ G.events.stats = function (st, X) {
   var cup = S ? S.cups[club.nat] : null;
   X.cupAlive = !!cup && cup.winner === null && cup.alive.indexOf(club.id) >= 0;
   X.euAlive = X.euro.some(function (k) {
-    var c = S.eu[k];
+    var c = G.sure(S).eu[k];  // X.euro is empty without a season
     return c.stage === 'lp' || (c.stage !== 'done' && (c.ties || []).some(function (t) { return t.indexOf(club.id) >= 0; }));
   });
   X.ptsGap = 0;
@@ -63,13 +63,13 @@ G.events.stats = function (st, X) {
 
 /** @param {string} txt @param {EvCtx} X */
 G.events.fill = function (txt, X) {
-  /** @type {Dict<any>} */
+  /** @type {Dict<string|number|undefined>} */
   var v = { club: X.club.name, coach: X.co ? X.co.n : 'il mister', league: X.L.name, name: X.p.name, rival: X.flags.newRival || (X.riv ? X.riv.name : 'i rivali'),
       riv: X.riv ? X.riv.name : 'i rivali', age: X.age, lgG: X.lgG, rank: X.scorerRank, leaderG: X.leaderG, bdoRank: X.bdoRank,
       lastG: X.lastG, lastApps: X.lastApps, avg: X.avg ? X.avg.toFixed(1) : '-', minPct: X.minPct, dry: X.dry, pos: X.pos, gap: X.ptsGap, nation: G.nationInfo(X.p.nat).name, follow: G.life.followers(X.p),
-      derby: X.derbyName || '', betN: X.betN, newRole: X.swap ? G.ROLES[X.swap.to].name.toLowerCase() : '', newOvr: X.swap ? X.swap.ovr : '',
+      derby: X.derbyName || '', betN: X.betN, newRole: X.swap ? G.POS[X.swap.pos || G.pos.std(X.swap.to, X.p.foot)].n.toLowerCase() : '', newOvr: X.swap ? X.swap.ovr : '',
       newPct: X.swap ? Math.round(X.swap.ch * 100) : '', nowPct: X.swap ? Math.round(X.swap.now * 100) : '', rivalName: X.st.records && X.st.records.rival ? X.st.records.rival.n : 'il tuo rivale' };
-  return txt.replace(/\{(\w+)\}/g, function (m, k) { return v[k] !== undefined ? v[k] : m; });
+  return txt.replace(/\{(\w+)\}/g, function (m, k) { return v[k] !== undefined ? String(v[k]) : m; });
 };
 
 /** @param {State} st */
@@ -95,20 +95,21 @@ G.events.roll = function (st) {
 
 /** @param {State} st @param {number} idx */
 G.events.apply = function (st, idx) {
-  var ev = st.event;
+  var ev = G.sure(st.event);
   if (!ev) return;
   if (ev.moment) return G.moments.pick(st, idx);
   if (ev.mgrht) return G.mgrLive.pick(st, idx);
   if (ev.mgr) return G.mgrEv.apply(st, idx);
   var card = (ev.press ? G.press.cards : G.events.cards).filter(function (c) { return c.id === ev.id; })[0];
-  var opt = card.o[idx] || card.o[0], fx = opt[1] || /** @type {EventFx} */ ({}), X = G.events.ctx(st), txt = opt[2] || '';
+  var opt = card.o[idx] || card.o[0], fx = opt[1] || /** @type {EventFx} */ ({}), X = G.events.ctx(st), txt = /** @type {string|undefined} */ (opt[2] || '');
   if (fx.p !== undefined) {
     var ok = G.rng.chance(fx.p);
     G.events.effects(st, fx, X);
     G.events.effects(st, ok ? fx.ok || {} : fx.ko || {}, X);
     txt = ok ? opt[2] : (opt[3] || opt[2]);
   } else G.events.effects(st, fx, X);
-  if (fx.bet) G.press.bet(st, fx.bet, ev.betN[idx] !== undefined ? ev.betN[idx] : ev.betN[0], ev.o[idx] || ev.o[0]);
+  var bn = G.sure(ev.betN);  // read only on press cards with a bet, which have it
+  if (fx.bet) G.press.bet(st, fx.bet, bn[idx] !== undefined ? bn[idx] : bn[0], ev.o[idx] || ev.o[0]);
   st.event = null;
   st.eventResult = { t: ev.t, r: G.events.fill(txt || 'Fatto.', X) };
   G.news(st, (ev.press ? '' : '🗒️ ') + ev.t + ': ' + st.eventResult.r);
@@ -124,9 +125,10 @@ G.events.effects = function (st, fx, X) {
   if (fx.$) p.money = Math.max(Math.min(p.money, 0), Math.round(p.money + fx.$));
   if (fx.fo) p.form = G.clamp(p.form + fx.fo, -2, 2);
   if (fx.inj) p.inj = Math.max(0, p.inj + fx.inj);
-  if (fx.at) Object.keys(fx.at).forEach(function (k) {
+  var at = fx.at;
+  if (at) Object.keys(at).forEach(function (k) {
     var key = k === 'any' ? G.rng.pick(Object.keys(G.WEIGHTS[p.role])) : k;
-    p.attrs[key] = G.clamp(p.attrs[key] + fx.at[k], 15, 99);
+    p.attrs[key] = G.clamp(p.attrs[key] + G.sure(at)[k], 15, 99);
   });
   if (fx.at) p.ovr = G.player.ovr(p);
   if (fx.req) G.transfers.requestMove(st);
@@ -141,7 +143,7 @@ G.events.effects = function (st, fx, X) {
   }
   if (fx.dropAgent) { p.agent = null; G.news(st, '👋 Il tuo agente ti lascia'); }
   if (fx.offer) G.events.offer(st, fx.offer, X);
-  if (fx.role) G.player.setRole(st, G.events.roleSwap(st));
+  if (fx.role) G.player.setRole(st, G.sure(G.events.roleSwap(st)));  // the card is drawn only when a swap exists
   if (fx.mark) (st.flags || (st.flags = {}))[fx.mark] = { y: st.year, club: p.clubId }; // follow-up cards in events-data3.js
 };
 

@@ -6,7 +6,7 @@ const harness = require('./harness');
 // Full playing career: accept the best offer from a clearly bigger club, pick the first season goal,
 // train the role's key attributes; retire at 35
 function player(G, o) {
-  const st = o.st || G.game.newCareer({ name: o.name, nat: o.nat, role: o.role, foot: 'D', start: o.start || 'second', seed: o.seed });
+  const st = o.st || G.game.newCareer({ name: o.name, nat: o.nat, role: o.role || G.POS[o.pos].r, pos: o.pos, foot: o.foot || 'D', start: o.start || 'second', seed: o.seed });
   const p = st.player;
   p.plan.focus = o.focus || 'key';
   if (o.intensity !== undefined) p.plan.intensity = o.intensity;
@@ -29,7 +29,8 @@ function player(G, o) {
 function manager(G, st, seasons) {
   const m = st.mgr, forms = Object.keys(G.mgrTeam.FORMS), tactics = ['bal', 'att', 'def'];
   for (let s = 0; s < seasons && !st.over; s++) {
-    if (st.mgrOffers && st.mgrOffers.list && st.mgrOffers.list.length && (st.mgrOffers.why !== 'calls' || s >= 4)) G.mgr.start(st, st.mgrOffers.list[0]);
+    // the end-of-season calls from season 4; any other offer only without a job (M9 S2: mid-season offers are not taken)
+    if (st.mgrOffers && st.mgrOffers.list && st.mgrOffers.list.length && (st.mgrOffers.why === 'calls' ? s >= 4 : !G.mgr.active(st))) G.mgr.start(st, st.mgrOffers.list[0]);
     st.mgrOffers = null;
     if (!G.mgr.active(st)) break;
     const W = st.world, club = W.clubs[m.club];
@@ -54,6 +55,10 @@ const LIST = [
   { id: 'player-cc-esp', run: G => player(G, { name: 'Pablo Ruiz', nat: 'ESP', role: 'CC', seed: 303, focus: 'bal', intensity: 0 }) },
   { id: 'player-dc-ger', run: G => player(G, { name: 'Jan Vogt', nat: 'GER', role: 'DC', seed: 404, intensity: 2 }) },
   { id: 'player-es-fra', run: G => player(G, { name: 'Hugo Blanc', nat: 'FRA', role: 'ES', seed: 505, retireAge: 33 }) },
+  // M9 S5 (P6): a new career for three positions that are not a role of before, 8 seasons
+  { id: 'player-trq-ita', run: G => player(G, { name: 'Dario Fanti', nat: 'ITA', pos: 'TRQ', seed: 1201, seasons: 8 }) },
+  { id: 'player-med-eng', run: G => player(G, { name: 'Jack Moss', nat: 'ENG', pos: 'MED', seed: 1202, seasons: 8 }) },
+  { id: 'player-sp-arg', run: G => player(G, { name: 'Lucas Paz', nat: 'ARG', pos: 'SP', foot: 'S', seed: 1203, seasons: 8 }) },
   { id: 'manager-prov', run: G => { const st = G.game.newManager({ name: 'Rino Sala', nat: 'ITA', bg: 'prov', age: 38, seed: 606 }); G.mgr.start(st, st.mgrOffers.list[0]); return manager(G, st, 10); } },
   { id: 'manager-naz', run: G => { const st = G.game.newManager({ name: 'Iker Mora', nat: 'ESP', bg: 'naz', age: 42, seed: 707 }); G.mgr.start(st, st.mgrOffers.list[0]); return manager(G, st, 10); } },
   { id: 'manager-young', run: G => { const st = G.game.newManager({ name: 'Ben Ward', nat: 'ENG', bg: 'young', age: 33, seed: 808 }); G.mgr.start(st, st.mgrOffers.list[0]); return manager(G, st, 10); } },
@@ -86,8 +91,63 @@ const LIST = [
   // M8 phase C: one season match by match with "Gioca in diretta", every half-time answer in turn
   { id: 'manager-live', run: G => live(G) },
   // M8 phases D and E: the FIFA-style market (and the academy)
-  { id: 'manager-fifa', run: G => fifa(G) }
+  { id: 'manager-fifa', run: G => fifa(G) },
+  // M9 S2: the coaches' market, applying to every open bench where the interest is 70 or more
+  { id: 'manager-carousel', run: G => carousel(G) },
+  // M9 S4: 8 seasons, the pact alternating "Ambizioso" and "Ricostruzione" (when the board says no, "Normale")
+  { id: 'manager-pact', run: G => pact(G) }
 ];
+
+// M9 S4 (M11.9): the pact of every summer, then the season as manager plays it; checks that
+// the expectations and the goal stay inside their limits
+function pact(G) {
+  const st = G.game.newManager({ name: 'Paco Patto', nat: 'ESP', bg: 'naz', age: 41, seed: 1107 });
+  G.mgr.start(st, st.mgrOffers.list[0]);
+  for (let s = 0; s < 8 && !st.over; s++) {
+    if (G.mgr.active(st) && G.mgrPact.open(st)) G.mgrPact.set(st, s % 2 ? 'reb' : 'amb');
+    const m = st.mgr, club = m.club !== null ? st.world.clubs[m.club] : null;
+    if (club && ((club.exp || 0) < -2 || (club.exp || 0) > 4 || m.obj.tgt < 1 || m.obj.tgt >= m.obj.n)) throw new Error('manager-pact: exp ' + club.exp + ', goal ' + m.obj.tgt);
+    manager(G, st, 1);
+  }
+  return st;
+}
+
+// M9 S2 (M10.9): 10 seasons block by block; applies to every open bench with interest >= 70,
+// takes every offer made mid-season (resigning if the club does not let him go) and the first one without a job,
+// turns down the end-of-season calls. The board is kept patient, so the moves are the market's
+function carousel(G) {
+  const st = G.game.newManager({ name: 'Gino Giro', nat: 'ITA', bg: 'naz', age: 40, seed: 1006 });
+  G.mgr.start(st, st.mgrOffers.list[0]);
+  const y0 = st.S.year, m = st.mgr;
+  let guard = 0;
+  while (!st.over && (!st.S || st.S.year < y0 + 10) && guard++ < 200) {
+    (st.vac || []).forEach(v => { if (!v.held && v.app === undefined && v.club !== m.club && G.mgrJobs.interest(st, st.world.clubs[v.club]) >= 70) G.mgrJobs.apply(st, v.club); });
+    const mo = st.mgrOffers;
+    if (mo && mo.list.length && (mo.why === 'mid' || mo.why === 'vacancy' || !G.mgr.active(st))) G.mgrJobs.take(st, 0, true);
+    else if (!G.mgr.active(st)) { G.mgrJobs.wait(st); continue; }
+    if (st.mgrOffers && st.mgrOffers.why === 'calls') st.mgrOffers = null;
+    if (st.event) G.mgrEv.apply(st, 0);
+    st.recap = null; m.conf = Math.max(m.conf, 30);
+    G.game.next(st, true);
+    benches(st);
+  }
+  if (m.jobs < 3) throw new Error('manager-carousel: ' + (m.jobs - 1) + ' changes of club in 10 seasons, at least 2 expected');
+  return st;
+}
+
+// Every club has one coach, sitting on its bench, and no coach sits on two
+function benches(st) {
+  const W = st.world, seen = {};
+  W.clubs.forEach(c => {
+    const co = W.coaches[c.coach];
+    if (!co || co.c !== c.id) throw new Error('benches: ' + c.name + ' has coach ' + c.coach + (co ? ', who is at club ' + co.c : ''));
+  });
+  W.coaches.forEach(co => {
+    if (co.c < 0) return;
+    if (seen[co.c] || W.clubs[co.c].coach !== co.i) throw new Error('benches: two coaches on the bench of ' + W.clubs[co.c].name);
+    seen[co.c] = 1;
+  });
+}
 
 function live(G) {
   const st = G.game.newManager({ name: 'Leo Vivo', nat: 'ITA', bg: 'prov', age: 39, seed: 1005 });
@@ -118,7 +178,7 @@ function fifa(G) {
   m.assist.contracts = 0;
   let guard = 0;
   while (!st.over && st.S && st.S.year < y0 + 6 && guard++ < 100) {
-    if (st.mgrOffers && st.mgrOffers.list && st.mgrOffers.list.length && st.mgrOffers.why !== 'calls') G.mgr.start(st, st.mgrOffers.list[0]);
+    if (st.mgrOffers && st.mgrOffers.list && st.mgrOffers.list.length && !G.mgr.active(st)) G.mgr.start(st, st.mgrOffers.list[0]);  // without a job only (M9 S2)
     st.mgrOffers = null; st.recap = null;
     if (st.event) G.mgrEv.apply(st, 0);
     if (!G.mgr.active(st)) break;

@@ -21,7 +21,7 @@ G.ui.btn = function (act, v, t, cls, off) { return '<button class="' + (cls || '
 /** @param {State} st @param {string} act @param {string} v @returns {string|boolean} */
 G.ui.mgrDealAct = function (st, act, v) {
   if (!st.mgr || !G.mgr.active(st)) return false;
-  var D = G.mgrDeal, m = st.mgr, s = G.ui.sel, say = /** @param {string} t */ function (t) { G.ui.flash = { mgr: t }; };
+  var D = G.mgrDeal, m = G.mgr.job(st), s = G.ui.sel, say = /** @param {string} t */ function (t) { G.ui.flash = { mgr: t }; };
   if (act === 'mkt') { G.ui.tab = 'mercato'; s.mkt = v; return 'view'; }
   if (act === 'mf') {
     var x = v.split(':');
@@ -55,8 +55,8 @@ G.ui.mgrDealAct = function (st, act, v) {
 // The tab: the numbers on top, then the inner tabs (only the loans while the window is shut)
 /** @param {State} st @returns {string} */
 G.ui.mgrMarket = function (st) {
-  var W = st.world, m = st.mgr, club = W.clubs[m.club], open = G.mgr.open(st), D = G.CFG2.MGR_DEAL, s = G.ui.sel;
-  var left = G.CFG.MGR.BUYS[st.S.block === 0 ? 0 : 1] - (m.buys || 0), reps = D.REPORTS - Object.keys(m.rep2 || {}).length;
+  var W = st.world, m = G.mgr.job(st), club = W.clubs[m.club], open = G.mgr.open(st), D = G.CFG2.MGR_DEAL, s = G.ui.sel;
+  var left = G.CFG.MGR.BUYS[G.sure(st.S).block === 0 ? 0 : 1] - (m.buys || 0), reps = D.REPORTS - Object.keys(m.rep2 || {}).length;
   var head = '<div class="kpis">' + G.ui.kpi(Math.round(club.bud) + ' M€', 'Budget') + G.ui.kpi(G.mgrDeal.margin(st).toFixed(1) + ' M€', 'Margine ingaggi l’anno') +
     G.ui.kpi(open ? String(left) : '-', 'Acquisti rimasti') + G.ui.kpi(open ? String(reps) : '-', 'Relazioni rimaste') + G.ui.kpi(club.sq.length + '/' + G.CFG.SQUAD_MAX, 'Rosa') + '</div>';
   var fl = G.ui.flash && G.ui.flash.mgr ? '<div class="notice">' + G.ui.flash.mgr + '</div>' : '';
@@ -69,13 +69,13 @@ G.ui.mgrMarket = function (st) {
     return '<button data-act="mkt" data-v="' + k + '" class="' + (tab === k ? 'on' : 'ghost') + '">' + G.ui.MKT[k] + (k === 'offerte' && n ? ' (' + n + ')' : k === 'tratta' && m.deal ? ' •' : '') + '</button>';
   }).join('') + '</nav>';
   var body = tab === 'cerca' ? G.ui.mktSearch(st) : tab === 'tratta' ? G.ui.mktDeal(st) : tab === 'offerte' ? G.ui.mktBids(st) : G.ui.mktLoans(st);
-  return '<div class="grid">' + G.ui.card('💼 Mercato · aperto (' + (st.S.block === 0 ? 'estate' : 'inverno') + ')', fl + head + nav + body, 'span3 mkt') + '</div>';
+  return '<div class="grid">' + G.ui.card('💼 Mercato · aperto (' + (G.sure(st.S).block === 0 ? 'estate' : 'inverno') + ')', fl + head + nav + body, 'span3 mkt') + '</div>';
 };
 
 // ---------- the search ----------
 /** @param {State} st @returns {string} */
 G.ui.mktSearch = function (st) {
-  var m = st.mgr, W = st.world, s = G.ui.sel, D = G.CFG2.MGR_DEAL, reps = D.REPORTS - Object.keys(m.rep2).length;
+  var m = G.mgr.job(st), W = st.world, s = G.ui.sel, D = G.CFG2.MGR_DEAL, reps = D.REPORTS - Object.keys(m.rep2).length;
   if (s.mfnat && !s.mfon) s.mfon = 1;  // the nation's select (data-sel) only sets mfnat
   var f = G.ui.mktFilter();
   var /** @type {Dict<string>} */ roles = { 'r:': 'Tutti' }; G.ROLE_KEYS.forEach(function (r) { roles['r:' + r] = G.ROLES[r].label; });
@@ -114,7 +114,7 @@ G.ui.mktSearch = function (st) {
 // ---------- the negotiation ----------
 /** @param {State} st @returns {string} */
 G.ui.mktDeal = function (st) {
-  var m = st.mgr, d = m.deal, W = st.world, D = G.CFG2.MGR_DEAL, r1 = G.mgrDeal.r1;
+  var m = G.mgr.job(st), d = m.deal, W = st.world, D = G.CFG2.MGR_DEAL, r1 = G.mgrDeal.r1;
   if (!d) return '<p class="muted">Nessuna trattativa aperta: scegli un giocatore in 🔎 Cerca e premi 🤝 Tratta.</p>';
   var pl = W.players[d.id], s = pl.c >= 0 ? W.clubs[pl.c] : null, price = G.mgr.price(st, pl), pot = G.mgrDeal.pot(st, pl), L = G.mgrSq.LABEL;
   var h = '<div class="mkd">' + (s ? G.crest(s, 34) : '') + '<div><b>' + G.ui.flag(pl.nt) + ' ' + pl.n + '</b> <span class="muted small">' + G.ROLES[pl.r].label + ' · ' + pl.a + ' anni · OVR ' + Math.round(pl.o) +
@@ -127,9 +127,9 @@ G.ui.mktDeal = function (st) {
   } else if (d.step === 'counter' && s) {
     h += '<div class="notice warn">↩️ Il ' + s.name + ' chiede ' + d.fee + ' M€.</div><div class="row">' + G.ui.btn('mctr', 1, '✅ Accetta ' + d.fee + ' M€') + G.ui.btn('mctr', 0, '❌ Rifiuta', 'ghost small') + '</div>';
   } else if (d.step === 'player') {
-    var /** @type {Dict<string>} */ wk = {}, /** @type {Dict<string>} */ sr = {}, /** @type {Dict<string>} */ yrs = {};
+    var /** @type {Dict<string>} */ wk = {}, /** @type {Dict<string>} */ sr = {}, /** @type {Dict<string>} */ yrs = {}, want = d.want;
     D.WAGE.forEach(function (x, k) { wk['wk:' + k] = Math.round(x * 100) + '% · ' + G.mgrDeal.wage(st, pl, k) + ' k€'; });
-    ['cru', 'imp', 'rot'].concat(pl.a <= 21 ? ['pro'] : []).forEach(function (r) { sr['sr:' + r] = L[r] + (r === d.want ? ' (gli spetta)' : ''); });
+    ['cru', 'imp', 'rot'].concat(pl.a <= 21 ? ['pro'] : []).forEach(function (r) { sr['sr:' + r] = L[r] + (r === want ? ' (gli spetta)' : ''); });
     for (var y = 1; y <= 5; y++) yrs['yrs:' + y] = y + (y === 1 ? ' anno' : ' anni');
     h += '<div class="muted small">2 · Contratto con ' + pl.n + (s ? ' · accordo con il club: ' + d.fee + ' M€' + (d.loan ? ' per il prestito' : '') : '') + '</div>' +
       '<div class="small">Ingaggio a settimana</div>' + G.ui.mgrOpts('mdk', wk, 'wk:' + d.wk) +

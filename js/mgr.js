@@ -18,6 +18,9 @@ G.mgr.BG = {
 
 /** @param {State} st @returns {boolean} */
 G.mgr.active = function (st) { return !!(st.mgr && st.mgr.club !== null && !st.mgr.done); };
+// The manager of a club, for the functions that run only while G.mgr.active(st) (type checker only, see MgrJob)
+/** @param {State} st @returns {MgrJob} */
+G.mgr.job = function (st) { return /** @type {MgrJob} */ (st.mgr); };
 
 // Starting reputation from the playing career
 /** @param {State} st @returns {number} */
@@ -51,9 +54,7 @@ G.mgr.offers = function (st, low) {
   var fit = G.rng.shuffle(W.clubs.filter(function (c) { return c.id !== cur && love.indexOf(c) < 0 && c.rep >= rep - 12 && c.rep <= rep + 3; }))
     .slice(0, M.OFFERS - love.length).sort(function (a, b) { return b.rep - a.rep; });
   if (!love.length && !fit.length) fit = W.clubs.filter(function (c) { return c.id !== cur; }).sort(function (a, b) { return Math.abs(a.rep - rep) - Math.abs(b.rep - rep); }).slice(0, 2);
-  return love.concat(fit).map(function (c) {
-    return { club: c.id, fans: Math.round(p.fans[c.id] || 0), perks: G.mgr.perks(p.fans[c.id] || 0), bandiera: p.bandiera[c.id] ? 1 : 0 };
-  });
+  return love.concat(fit).map(function (c) { return G.mgrJobs.offer(st, c.id); });  // with the club's interest (M9 S2)
 };
 
 /** @param {State} st @param {string} why @param {number} [low] */
@@ -75,8 +76,9 @@ G.mgr.start = function (st, o) {
     G.mgr.leave(st);
   }
   m.role = 'mgr'; m.club = club.id; m.conf = M.CONF0 + k.pat; m.pat = k.pat; m.perks = k; m.jobs++;
-  m.morale = G.clamp(55 + k.mor, 0, 100); m.tactic = m.tactic || 'bal'; m.buys = 0; m.tg = null;
+  m.morale = G.clamp(55 + k.mor, 0, 100); m.tactic = m.tactic || 'bal'; m.buys = 0; m.tg = null; m.big = 0; m.soldOwn = 0;
   m.mode = 'auto'; m.xi = null; m.cond = {}; m.starts = {}; m.played = 0;
+  m.contract = G.mgrJobs.contract(st, club); delete m.renew; delete m.idle; delete m.idleAt;  // M9 S2
   st.over = false; st.retireReason = null; st.mgrOffers = null; st.recap = null; st.event = null; st.offers = []; st.hofSaved = false;
   p.clubId = club.id; p.loanFrom = null; p.captain = null;
   if (k.bud) club.bud += G.mgr.budBonus(club, k);
@@ -89,6 +91,9 @@ G.mgr.start = function (st, o) {
   else { G.season.refresh(st); G.mgr.objective(st); G.mgrBoard.goals(st); }
   G.mgrTeam.init(m); G.mgrSq.start(st); G.mgrDeal.start(st); G.mgrYouth.start(st); G.mgrTeam.xi(st);
   G.mgrLife.start(st);
+  G.mgr.marketFloor(st);  // a small club can buy too (M9, fix after S2), with the heir already in the squad
+  G.mgrPact.start(st, o.pact);  // the president and the pact of the offer (M9 S4)
+  G.mgrTac.start(st, o.play);  // tactical familiarity, the levers of the interview (M9 S6)
 };
 
 // Leave the current club (sacked, resigned or retired): the club hires a new coach
@@ -104,9 +109,10 @@ G.mgr.leave = function (st) {
 // Board objective from the squad's strength rank in the league
 /** @param {State} st */
 G.mgr.objective = function (st) {
-  var m = st.mgr, W = st.world, S = st.S, club = W.clubs[m.club], ids = S.lg[club.lg].ids, L = G.leagueByKey(club.lg);
+  var m = G.mgr.job(st), W = st.world, S = G.sure(st.S), club = W.clubs[m.club], ids = S.lg[club.lg].ids, L = G.leagueByKey(club.lg);
   var exp = ids.slice().sort(function (a, b) { return W.clubs[b].str - W.clubs[a].str; }).indexOf(club.id) + 1, n = ids.length;
   var tgt = exp === 1 ? 1 : Math.min(n - 1, exp + 1), P = G.CFG.PROMO_SLOTS;  // never 'finish last is fine'
+  tgt = G.mgrPact.target(st, tgt, exp, n);  // the expectations and the pact (M9 S4)
   if (L.tier === 1 && G.NATIONS[club.nat].leagues.length > 1) tgt = Math.min(tgt, n - P);  // at least stay up
   var txt = tgt === 1 ? 'Vincere il campionato' : L.tier === 2 && tgt <= P ? 'Promozione' : tgt <= n / 4 ? 'Chiudere tra le prime ' + tgt :
     tgt <= n / 2 ? 'Parte sinistra della classifica' : tgt >= n - 5 ? 'Salvezza' : 'Metà classifica';
@@ -116,22 +122,29 @@ G.mgr.objective = function (st) {
 /** @param {State} st */
 G.mgr.seasonStart = function (st) {
   if (!G.mgr.active(st)) return;
-  st.mgr.buys = 0; st.mgr.tg = null;
+  G.mgr.job(st).buys = 0; G.mgr.job(st).tg = null; G.mgr.job(st).big = 0; G.mgr.job(st).soldOwn = 0; delete G.mgr.job(st).inv;
+  G.mgrPact.seasonStart(st);  // the advance back, a new owner (M9 S4)
   G.mgr.objective(st);
   G.mgrBoard.goals(st);  // the board's goals (M8 phase F)
   G.mgrSq.sync(st);
   G.mgrDeal.window(st);  // the summer window opens (M8 phase D)
+  var f = G.mgr.job(st).fin, b0 = st.world.clubs[G.mgr.job(st).club].bud;
+  G.mgr.marketFloor(st);
+  if (f) f.floor = G.mgrDeal.r1(st.world.clubs[G.mgr.job(st).club].bud - b0);
+  G.mgrPact.summer(st);  // the pact, "Normale" until the manager chooses (M9 S4)
+  G.mgrAsk.window(st);  // the board may ask something
   G.mgrYouth.seasonStart(st);  // the scouts are paid (phase E)
 };
 
 // Every match of the managed club: fitness, and a row for the dashboard (with our scorers)
 /** @param {State} st @param {boolean} home @param {ClubId} opp @param {number[]} res @param {MatchComp} comp @param {MatchSide} side */
 G.mgr.matchRow = function (st, home, opp, res, comp, side) {
-  var W = st.world, m = st.mgr, club = W.clubs[m.club], S = st.S;
+  var W = st.world, m = G.mgr.job(st), club = W.clubs[m.club], S = st.S;
   G.mgrTeam.after(st, side);
+  if (m.pact) m.pact.open = 0;  // the pact is fixed from the first match (M9 S4)
   if (!S || !S.cur) return;
   var /** @type {string[]} */ sc = [], rt = (side.rt || []).map(function (r) { return Math.round(r * 10) / 10; }), best = -1;
-  (side.gl || []).forEach(function (n, k) { for (var i = 0; i < n; i++) sc.push(W.players[side.ids[k]].n.split(' ').slice(-1)[0]); });
+  (side.gl || []).forEach(function (n, k) { for (var i = 0; i < n; i++) sc.push(G.squads.sur(W.players[side.ids[k]].n)); });
   rt.forEach(function (r, k) { if (best < 0 || r > rt[best]) best = k; });
   var /** @type {MatchRow} */ row = { opp: opp, home: home, gf: home ? res[0] : res[1], ga: home ? res[1] : res[0], mins: 0, g: 0, a: 0, r: 0, comp: comp.name,
     derby: club.riv.indexOf(opp) >= 0, mgr: 1, sc: sc, form: m.form, tac: m.tactic, ck: comp.ck, rd: comp.rd, dt: S.today, rt: rt, xi: side.ids.slice() };
@@ -142,10 +155,10 @@ G.mgr.matchRow = function (st, home, opp, res, comp, side) {
 // After each block: board confidence follows the table, morale follows results
 /** @param {State} st @param {number} b */
 G.mgr.block = function (st, b) {
-  var M = G.CFG.MGR, C = G.CFG, m = st.mgr, S = st.S, p = st.player;
+  var M = G.CFG.MGR, C = G.CFG, m = G.mgr.job(st), S = G.sure(st.S), p = st.player;
   if (!G.mgr.active(st) || b > 4) return;
   var club = st.world.clubs[m.club], pos = G.season.sortTable(S, club.lg).indexOf(club.id) + 1, gap = m.obj.tgt - pos;
-  var w = M.BLOCK_CONF * C.BLOCK_SHARE[b] / 0.25 * (gap >= 0 ? 1 : 1 - m.pat / 100);
+  var w = M.BLOCK_CONF * C.BLOCK_SHARE[b] / 0.25 * (gap >= 0 ? 1 : (1 - G.mgrPact.pat(st) / 100) * G.mgrPact.loss(st));  // pact and president (M9 S4)
   m.conf = Math.round(G.clamp(m.conf + G.clamp(gap, -6, 6) * w, -10, 100));
   var rows = S.blockRows.filter(function (r) { return r.mgr; }), wins = rows.filter(function (r) { return r.gf > r.ga; }).length, loss = rows.filter(function (r) { return r.gf < r.ga; }).length;
   m.morale = Math.round(G.clamp(m.morale + (gap >= 0 ? 2 : -2) + (wins - loss) * M.MORALE_RES + (55 - m.morale) * 0.15, 0, 100));
@@ -155,20 +168,21 @@ G.mgr.block = function (st, b) {
   G.mgrLife.block(st);
   G.mgrAw.block(st, b);
   p.money += Math.round(G.mgr.wage(st) * C.WEEKS_PER_BLOCK * (1 - C.TAX));
-  if (b === 1) { m.buys = 0; m.tg = null; G.mgrDeal.window(st); }  // the winter window opens
   G.mgrBoard.block(st);  // out of a cup before the goal: -4
+  G.mgrAsk.block(st); G.mgrPact.block(st);  // the board's requests, the president (M9 S4)
+  if (b === 1) { m.buys = 0; m.tg = null; G.mgrDeal.window(st); G.mgrAsk.window(st); }  // the winter window opens
   if (m.conf <= 0 && b < 4) G.mgr.sack(st, 'Esonerato a stagione in corso');
 };
 
 /** @param {State} st @returns {number} */
 G.mgr.wage = function (st) {
-  var m = st.mgr, club = st.world.clubs[m.club];
-  return Math.round(G.squads.wage(m.rep + 8, club) * 0.7);
+  var m = G.mgr.job(st), club = st.world.clubs[m.club];
+  return m.contract ? m.contract.wage : Math.round(G.squads.wage(m.rep + 8, club) * 0.7);  // saves from before M9 S2 have no contract
 };
 
 /** @param {State} st @param {string} [note] @returns {MgrSeason} */
 G.mgr.record = function (st, note) {
-  var m = st.mgr, W = st.world, club = W.clubs[m.club], S = st.S;
+  var m = G.mgr.job(st), W = st.world, club = W.clubs[m.club], S = st.S;
   var /** @type {MgrSeason} */ r = { year: S ? S.year : st.year, age: st.player.age, club: club.name, clubId: club.id, role: 'mgr', lg: G.leagueByKey(club.lg).name,
     pos: S ? G.season.sortTable(S, club.lg).indexOf(club.id) + 1 : null, tgt: m.obj ? m.obj.tgt : null, won: [], note: note || '' };
   m.hist.push(r);
@@ -177,19 +191,21 @@ G.mgr.record = function (st, note) {
 
 /** @param {State} st @param {string} note */
 G.mgr.sack = function (st, note) {
-  var m = st.mgr, club = st.world.clubs[m.club];
+  var m = G.mgr.job(st), club = st.world.clubs[m.club];
   G.mgr.record(st, note);
   m.sacked++; m.rep = Math.max(40, m.rep - 3); m.lastClub = club.id;
   G.life.fans(st, club.id, -5);
   G.news(st, '🔥 Il ' + club.name + ' ti esonera');
+  G.mgrJobs.payout(st);
   G.mgr.leave(st);
+  m.idle = 0; delete m.idleAt;
   G.mgr.offerSet(st, 'sacked', 4);
 };
 
 // End of season: objective, trophies, reputation, fans, young players, the board's verdict
 /** @param {State} st @param {Dict<ClubId[]>} tables @param {[ClubId, string][]} honours */
 G.mgr.seasonEnd = function (st, tables, honours) {
-  var M = G.CFG.MGR, m = st.mgr, W = st.world, S = st.S, p = st.player;
+  var M = G.CFG.MGR, m = G.mgr.job(st), W = st.world, S = G.sure(st.S), p = st.player;
   if (!G.mgr.active(st)) return;
   var club = W.clubs[m.club], L = G.leagueByKey(club.lg), pos = tables[club.lg].indexOf(club.id) + 1, gap = m.obj.tgt - pos;
   var won = honours.filter(function (h) { return h[0] === club.id; }).map(function (h) { return h[1]; });
@@ -199,6 +215,9 @@ G.mgr.seasonEnd = function (st, tables, honours) {
   // the board judges all its goals (M8 phase F), no longer the league alone
   var score = m.goals ? G.mgrBoard.score(st) : 0.5;
   m.conf = Math.round(G.clamp(m.conf + (score - 0.5) * 2 * M.END_CONF + won.length * M.TROPHY_CONF, -20, 100));
+  var down = L.tier === 1 && G.NATIONS[club.nat].leagues.length > 1 && pos > tables[club.lg].length - G.CFG.PROMO_SLOTS;
+  G.mgrPact.seasonEnd(st, pos, cups, down);  // the pact's reward, the advance, the expectations (M9 S4)
+  G.mgrId.seasonEnd(st);  // the club's identity: patience and fans (M9 S3)
   var rep0 = m.rep;
   // winning with a small club only goes so far: gains shrink once you are well above the club's level
   var dRep = G.clamp(gap * 0.6, -3, 3) + cups * 1.5 + (pos === 1 && L.tier === 1 ? 2 : 0);
@@ -220,17 +239,19 @@ G.mgr.seasonEnd = function (st, tables, honours) {
   if (m.conf <= 0) { st.recap.sacked = 1; m.hist.pop(); G.mgr.sack(st, 'Esonerato a fine stagione'); }
   else if (p.age + 1 >= M.MAX_AGE) st.recap.last = 1;
   else G.mgrBoard.ntCall(st);
-  if (!st.recap.sacked && !st.recap.last && m.rep >= club.rep + 4) {
-    G.mgr.offerSet(st, 'calls');
-    st.mgrOffers.list = st.mgrOffers.list.filter(function (o) { return W.clubs[o.club].rep > club.rep; });
-    if (!st.mgrOffers.list.length) st.mgrOffers = null;
-  }
+  // the contract (M9 S2): a year less, a renewal, or its end; then the clubs that call, by their interest
+  if (!st.recap.sacked && !st.recap.last && G.mgrJobs.seasonEnd(st, gap >= 0)) {
+    st.recap.free = 1; m.lastClub = club.id; delete m.contract;
+    G.news(st, '📄 Il contratto con il ' + club.name + ' è finito: sei libero');
+    G.mgr.leave(st); m.idle = 0; delete m.idleAt;
+    G.mgr.offerSet(st, 'free', 2);
+  } else if (!st.recap.sacked && !st.recap.last) G.mgrJobs.calls(st, club);
 };
 
 // Hang up for good: the career ends and goes to the Hall of Fame
 /** @param {State} st */
 G.mgr.retire = function (st) {
-  var m = st.mgr;
+  var m = G.mgr.job(st);
   if (G.mgr.active(st)) {
     var S = st.S, fresh = !S || (!S.cur && S.block === 0);
     if (fresh && m.hist.length) m.hist[m.hist.length - 1].note += ' · poi il ritiro';
@@ -257,7 +278,7 @@ G.mgr.migrate = function (st) {
   if (m.role !== 'mgr') {
     m.role = 'mgr'; m.tactic = m.tactic || 'bal'; m.form = m.form || '4-4-2'; m.mode = 'auto';
     if (G.mgr.active(st)) {
-      var club = W.clubs[m.club], co = m.co >= 0 ? W.coaches[m.co] : G.coaches.add(W, { n: st.player.name, nt: st.player.nat, a: st.player.age, rep: m.rep, sty: 'motivatore', me: 1 });
+      var club = W.clubs[G.mgr.job(st).club], co = m.co >= 0 ? W.coaches[m.co] : G.coaches.add(W, { n: st.player.name, nt: st.player.nat, a: st.player.age, rep: m.rep, sty: 'motivatore', me: 1 });
       var old = G.coaches.of(W, club);
       if (old && old !== co) old.c = -1;
       m.co = co.i; co.c = club.id; club.coach = co.i; co.rep = m.rep;

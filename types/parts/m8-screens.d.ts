@@ -13,8 +13,6 @@ interface PitchCard {
   r: RoleKey;
   /** the big number: worth in the slot, overall, fitness, morale or form, as the view says */
   val: number | string;
-  /** orange number: worth less than the overall in this slot */
-  low?: boolean;
   /** bottom bar: 0..100 and its colour class ('' green, 'mid', 'bad') */
   bar: number;
   barCls: string;
@@ -31,8 +29,8 @@ interface PitchCard {
   /** on the pitch out of position: the natural role, shown small */
   off?: boolean;
   sel?: boolean;
-  /** while a player is selected: what he would be worth here, and the colour of the fit ('g', 'y', 'o', 'r') */
-  hint?: [number, string];
+  /** while a player is moved: the Forza XI after the move here, and the colour of his fit ('g', 'y', 'o', 'r') */
+  hint?: [number | string, string];
   act: string;
   v: string;
   aria: string;

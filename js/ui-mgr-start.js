@@ -35,7 +35,7 @@ G.ui.createMgr = function () {
 // End screen of a manager-only career
 /** @param {State} st */
 G.ui.renderMgrEnd = function (st) {
-  var p = st.player, m = st.mgr, sc = G.hof.score(st);
+  var p = st.player, m = G.sure(st.mgr), sc = G.hof.score(st);
   G.hof.add(st); G.save.write(st);
   $('#app').innerHTML = '<div class="card end-hero"><div class="muted">' + st.retireReason + '</div><h1>' + G.ui.flag(p.nat) + ' ' + p.name + '</h1>' +
     '<div class="grade">' + sc.icon + ' ' + sc.grade + '</div><div class="score" id="end-score" data-to="' + sc.total + '">0</div><div class="muted">punti leggenda</div>' +

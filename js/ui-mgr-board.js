@@ -8,14 +8,14 @@ G.ui.mgrBoardAct = function (st, act, v) {
   if (act === 'mnt') { G.ui.flash = { mgr: G.mgrBoard.ntAnswer(st, v === '1') }; return true; }
   if (act === 'massist') { G.ui.sel.assist = !G.ui.sel.assist; return 'view'; }
   var a = st.mgr.assist;
-  if (act === 'mast' && a && (v === 'contracts' || v === 'market' || v === 'youth')) { a[v] = a[v] ? 0 : 1; return 'keep'; }
+  if (act === 'mast' && a && (v === 'contracts' || v === 'market' || v === 'youth' || v === 'rotate')) { a[v] = a[v] ? 0 : 1; return 'keep'; }
   return false;
 };
 
 // Where a goal stands, in words
 /** @param {State} st @param {BoardGoal} g @returns {string} */
 G.ui.goalNow = function (st, g) {
-  var m = st.mgr, W = st.world, S = st.S, club = W.clubs[m.club];
+  var m = G.mgr.job(st), W = st.world, S = G.sure(st.S), club = W.clubs[m.club];
   if (g.k === 'lg') return 'ora ' + (G.season.sortTable(S, club.lg).indexOf(club.id) + 1) + 'º, obiettivo ' + m.obj.tgt + 'º';
   if (g.k === 'cup') {
     var cup = S.cups[club.nat], R = /** @type {Dict<string>} */ ({ 1: 'vinta', 2: 'in finale', 4: 'in semifinale', 8: 'ai quarti', 16: 'agli ottavi', 32: 'ai sedicesimi' });
@@ -32,12 +32,13 @@ G.ui.goalNow = function (st, g) {
     return (s[1] ? 'eliminati: ' : 'ancora in corsa: ') + where;
   }
   if (g.k === 'fin') return 'budget ' + Math.round(club.bud) + ' M€ · ingaggi ' + G.mgrLive.num(G.world.wageBill(W, club)).slice(1) + ' M€ su ' + G.mgrLive.num((g.lim || 0) + Math.max(0, m.wageRoom || 0)).slice(1);
+  if (g.k === 'idt') return G.mgrId.traits(W, club).map(function (k) { var v = G.mgrId.judge(st, k, g); return G.mgrId.T[k][0] + ' ' + G.mgrId.T[k][1] + ' ' + G.mgrBoard.ICON[v === 1 ? 'ok' : v ? 'mid' : 'ko']; }).join(' · ');
   return G.mgrBoard.young(st) + ' su 2';
 };
 
 /** @param {State} st @returns {string} the card on the bench */
 G.ui.mgrGoals = function (st) {
-  var m = st.mgr;
+  var m = G.mgr.job(st);
   if (!m.goals) return '';
   var rows = m.goals.map(function (g) {
     return '<div class="goal"><span class="gi">' + G.mgrBoard.ICON[g.st] + '</span><div><div>' + g.txt + ' <span class="chip">' + g.imp + '</span></div>' +
@@ -50,7 +51,7 @@ G.ui.mgrGoals = function (st) {
 
 /** @param {State} st @returns {string} a national team's offer, on the bench */
 G.ui.mgrNtNote = function (st) {
-  var m = st.mgr, nat = m.ntOffer;
+  var m = G.mgr.job(st), nat = m.ntOffer;
   if (!nat) return '';
   return '<div class="notice sqreq"><div>🌍 <b>' + G.national.name(nat) + '</b> ti vuole come ct, senza lasciare il club. <span class="muted small">Con te la nazionale avrebbe ' + G.mgrLive.num(G.mgrBoard.power(m)) + ' di forza; se non si qualifica a un torneo, l’incarico finisce.</span></div>' +
     '<div class="row">' + G.ui.btn('mnt', 1, '✅ Accetta') + G.ui.btn('mnt', 0, '❌ No, grazie', 'ghost small') + '</div><div class="muted small">Se non rispondi entro la prima partita, sceglie un altro ct.</div></div>';
@@ -58,7 +59,7 @@ G.ui.mgrNtNote = function (st) {
 
 /** @param {State} st @returns {string} the ct's line on the Carriera tab */
 G.ui.mgrNtLine = function (st) {
-  var m = st.mgr;
+  var m = G.mgr.job(st);
   if (m.nt) return '<div class="notice">🌍 Sei anche il ct di <b>' + G.national.name(m.nt) + '</b>: con te la nazionale ha ' + G.mgrLive.num(G.mgrBoard.ntBonus(st, m.nt)) + ' di forza. Se non si qualifica a un torneo, l’incarico finisce.</div>';
   return '<div class="muted small">🌍 Nessuna nazionale. Con una reputazione da 70 in su, a fine stagione può arrivare un’offerta da ct, da tenere insieme al club.</div>';
 };
@@ -66,16 +67,17 @@ G.ui.mgrNtLine = function (st) {
 // ---------- G1 · the assistant: what he does by himself, three switches opened from the bench ----------
 /** @param {State} st @returns {string} */
 G.ui.mgrAssist = function (st) {
-  var a = st.mgr.assist;
+  var a = G.mgr.job(st).assist;
   if (!G.ui.sel.assist || !a) return '';
   var D = G.CFG2.MGR_DEAL, Y = G.CFG2.MGR_YOUTH;
   var /** @type {[string, string, string, string][]} */ rows = [
     ['contracts', '✍️ Contratti', 'A fine stagione rinnova chi serve, cioè i titolari e i giovani migliori, e lascia andare gli altri.', 'I contratti in scadenza li rinnovi tu dalla Rosa: chi non rinnovi a giugno se ne va.'],
     ['market', '💼 Mercato', 'Risponde alle offerte (sì da 1,2 volte il valore in su, mai per un perno) e prima che il mercato chiuda compra: per un titolare ' + D.AUTO_GAP + ' o più punti sotto la forza della squadra, il miglior consigliato del suo ruolo che puoi permetterti.', 'Offerte e acquisti li fai tu.'],
-    ['youth', '🌱 Giovani', 'A ' + Y.OUT_AGE + ' anni promuove i ragazzi con un potenziale da almeno 72, se c’è posto, e svincola gli altri.', 'I ragazzi di ' + Y.OUT_AGE + ' anni aspettano te nel Vivaio.']];
+    ['youth', '🌱 Giovani', 'A ' + Y.OUT_AGE + ' anni promuove i ragazzi con un potenziale da almeno 72, se c’è posto, e svincola gli altri.', 'I ragazzi di ' + Y.OUT_AGE + ' anni aspettano te nel Vivaio.'],
+    ['rotate', '🔄 Turnover', 'Con la formazione in Auto fa riposare i titolari stanchi o che giocano sempre e dà minuti alle riserve e ai giovani nelle partite facili; nelle partite importanti giocano i migliori. Prima di ogni partita ti dice chi cambia.', 'Con la formazione in Auto giocano sempre i migliori disponibili; chi è stanco riposa solo sotto il ' + G.CFG.MGR_TEAM.REST_AT + '% di condizione.']];
   return '<div class="notice sqreq"><div>🤖 <b>Assistente</b> <span class="muted small">Tocca un interruttore per accenderlo o spegnerlo. Anche con “Simula stagione” fa solo quello che è acceso.</span></div>' +
     '<div class="trn">' + rows.map(function (r) {
-      var on = a[/** @type {'contracts'|'market'|'youth'} */ (r[0])];
+      var on = a[/** @type {'contracts'|'market'|'youth'|'rotate'} */ (r[0])];
       return '<button data-act="mast" data-v="' + r[0] + '" class="' + (on ? 'on' : 'ghost') + '"><b>' + r[1] + ' · ' + (on ? 'acceso' : 'spento') + '</b><small>' + (on ? r[2] : r[3]) + '</small></button>';
     }).join('') + '</div>' + G.ui.btn('massist', '', 'Chiudi', 'ghost small') + '</div>';
 };
@@ -83,7 +85,7 @@ G.ui.mgrAssist = function (st) {
 // ---------- G2 · the season preview: on the bench at block 0, before the first match ----------
 /** @param {State} st @returns {string} */
 G.ui.mgrPreview = function (st) {
-  var m = st.mgr, S = st.S, W = st.world, club = W.clubs[m.club], name = club.name;
+  var m = G.mgr.job(st), S = G.sure(st.S), W = st.world, club = W.clubs[m.club], name = club.name;
   if (S.block !== 0 || S.cur || !m.goals) return '';
   var lg = W.clubs.filter(function (c) { return c.lg === club.lg; }).sort(function (a, b) { return b.str - a.str || a.id - b.id; });
   var riv = lg.filter(function (c) { return c.id !== club.id; }).sort(function (a, b) { return Math.abs(a.str - club.str) - Math.abs(b.str - club.str) || a.id - b.id; }).slice(0, 3);

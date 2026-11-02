@@ -6,7 +6,7 @@
 // ---------- offers received ----------
 /** @param {State} st @returns {string} */
 G.ui.mktBids = function (st) {
-  var m = st.mgr, W = st.world, D = G.CFG2.MGR_DEAL, L = G.mgrSq.LABEL;
+  var m = G.mgr.job(st), W = st.world, D = G.CFG2.MGR_DEAL, L = G.mgrSq.LABEL;
   var list = (m.bids || []).map(function (b, i) {
     var pl = W.players[b.id], by = W.clubs[b.by], val = G.squads.value(pl.o, pl.a, pl.p), out = G.mgrDeal.wantsOut(m, pl.i);
     return '<div class="notice sqreq"><div>📨 ' + G.crest(by, 16) + ' <b>' + by.name + '</b> offre <b>' + b.fee + ' M€</b> per ' + pl.n +
@@ -22,7 +22,7 @@ G.ui.mktBids = function (st) {
 // ---------- loans, the transfer list, the budget split ----------
 /** @param {State} st @returns {string} */
 G.ui.mktLoans = function (st) {
-  var m = st.mgr, W = st.world, D = G.CFG2.MGR_DEAL, club = W.clubs[m.club], open = G.mgr.open(st), h = '';
+  var m = G.mgr.job(st), W = st.world, D = G.CFG2.MGR_DEAL, club = W.clubs[m.club], open = G.mgr.open(st), h = '';
   if (open) {
     var /** @type {Dict<string>} */ sp = {};
     D.SPLIT.forEach(function (x) { sp['x' + x] = x > 0 ? '+' + x + '%' : x < 0 ? '−' + -x + '%' : '0'; });  // 'x': keys keep their order
@@ -38,7 +38,7 @@ G.ui.mktLoans = function (st) {
   h += '<h4>🔁 Prestiti</h4>' + away.map(function (id) { var pl = W.players[id]; return '<div class="small">↗️ ' + pl.n + ' al ' + W.clubs[pl.c].name + ' <span class="muted">(forza ' + W.clubs[pl.c].str.toFixed(1) + ') · torna a fine stagione</span></div>'; }).join('') +
     loansIn.map(function (id) {
       var pl = W.players[id], L = m.loans[id];
-      if (pl.c === m.club) return '<div class="small">↙️ ' + pl.n + ' in prestito dal ' + W.clubs[pl.ln].name + ' <span class="muted">· riscatto ' + L.opt + ' M€ nella finestra estiva</span></div>';
+      if (pl.c === m.club) return '<div class="small">↙️ ' + pl.n + ' in prestito dal ' + W.clubs[G.sure(pl.ln)].name + ' <span class="muted">· riscatto ' + L.opt + ' M€ nella finestra estiva</span></div>';
       return '<div class="notice sqreq"><div>↙️ <b>' + pl.n + '</b> è tornato al ' + W.clubs[pl.c].name + ' <span class="muted small">OVR ' + Math.round(pl.o) + ' · ' + pl.a + ' anni</span></div><div class="row">' +
         G.ui.btn('mopt', id + ':1', '✅ Riscatta per ' + L.opt + ' M€', 'small', !open) + G.ui.btn('mopt', id + ':0', '↩️ Lascia andare', 'ghost small', !open) + '</div><div class="muted small">Se non decidi entro la chiusura del mercato, resta lì.</div></div>';
     }).join('');
@@ -55,7 +55,7 @@ G.ui.mktLoans = function (st) {
 // ---------- the bench and the Rosa tab ----------
 /** @param {State} st @returns {string} the market's notices on the bench */
 G.ui.mgrDealNotes = function (st) {
-  var m = st.mgr, W = st.world, S = st.S, h = '', n = (m.bids || []).length;
+  var m = G.mgr.job(st), W = st.world, S = G.sure(st.S), h = '', n = (m.bids || []).length;
   if (G.mgr.open(st) && n) h += '<div class="notice clickable" data-act="mkt" data-v="offerte">📨 ' + (n === 1 ? '1 offerta' : n + ' offerte') + ' per i tuoi giocatori: guarda il mercato.</div>';
   if (G.mgr.open(st)) Object.keys(m.loans || {}).forEach(function (k) {
     var L = m.loans[+k], pl = W.players[+k];
@@ -69,7 +69,7 @@ G.ui.mgrDealNotes = function (st) {
 // The renewal on top of the Rosa tab (G.ui.sel.ren = the player)
 /** @param {State} st @returns {string} */
 G.ui.mgrRenew = function (st) {
-  var m = st.mgr, S = st.S, id = G.ui.sel.ren, pl = id === null || id === undefined ? null : st.world.players[id];
+  var m = G.mgr.job(st), S = G.sure(st.S), id = G.ui.sel.ren, pl = id === null || id === undefined ? null : st.world.players[id];
   if (!pl || !G.mgrDeal.canRenew(st, pl)) return '';
   var a = G.mgrDeal.renewAsk(st, pl.i), body = '';
   if (m.neg[pl.i]) body = '<div class="muted small">Ha già detto no: riprova nella prossima finestra di mercato.</div>';

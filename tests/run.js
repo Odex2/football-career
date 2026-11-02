@@ -67,7 +67,7 @@ function careers(ids, workers) {
   let G = null;
   try { G = harness.load(); report('the game loads', []); } catch (e) { report('the game loads', [String(e.stack || e).split('\n').slice(0, 4).join(' | ')]); }
   if (G) report('data: event, press and manager cards, decisive moments', checks.data(G));
-  if (G) m8.CHECKS.forEach(c => { let p; try { p = c.f(harness.load); } catch (e) { p = [String(e.stack || e).split('\n').slice(0, 4).join(' | ')]; } report(c.t, p); });
+  if (G) m8.CHECKS.filter(c => !(c.slow && argv.includes('--quick'))).forEach(c => { let p; try { p = c.f(harness.load); } catch (e) { p = [String(e.stack || e).split('\n').slice(0, 4).join(' | ')]; } report(c.t, p); });
   types();
   if (!argv.includes('--quick')) {
     const { LIST } = require('./scenarios');

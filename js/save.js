@@ -10,7 +10,7 @@ G.save = {
   key: function (i) { return G.save.KEYS[i === undefined ? G.save.slot : i]; },
   // NPC players (about 12 500) are saved as rows of values instead of objects with keys: half the size
   ABSENT: '~',
-  /** @param {any[]} list @returns {{ K: string[], rows: any[][] }} */
+  /** @param {any[]} list @returns {{ K: string[], rows: (any[]|null)[] }} */
   pack: function (list) {
     var /** @type {string[]} */ K = [], /** @type {Dict<number>} */ seen = {}, A = G.save.ABSENT;
     list.forEach(function (x) { for (var k in x) if (!seen[k]) { seen[k] = 1; K.push(k); } });
@@ -24,7 +24,7 @@ G.save = {
       });
     }) };
   },
-  /** @param {{ K: string[], rows: any[][] }} P @returns {any[]} */
+  /** @param {{ K: string[], rows: (any[]|null)[] }} P @returns {any[]} */
   unpack: function (P) {
     var A = G.save.ABSENT;
     return P.rows.map(function (r) {
@@ -91,6 +91,7 @@ G.save = {
     G.agents.ensure(st);
     G.national.init(st);
     G.mgr.migrate(st);
+    if (!st.player.fam && !st.player.mgrOnly) { var p = st.player; p.pos = G.pos.std(p.role, p.foot); p.main = p.pos; p.fam = {}; p.fam[p.pos] = 100; p.famY = {}; }  // M9 S5
     return st;
   },
   /** @param {number} [i] */

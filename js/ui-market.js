@@ -8,12 +8,12 @@ G.ROLE_PROMISE = { titolare: '⭐ Titolare', rotazione: '🔄 Rotazione', riserv
 G.ui.offerCard = function (st, o) {
   var W = st.world, c = W.clubs[o.club], L = G.leagueByKey(c.lg), ag = G.life.agent(st.player), left = 2 - o.rounds;
   var type = /** @type {Dict<string>} */ ({ transfer: 'Trasferimento', renew: 'Rinnovo', loan: 'Prestito' })[o.type];
-  var flash = G.ui.flash && G.ui.flash.id === o.id ? G.ui.flash.clause === 'ok' ? '💥 Pagano la clausola: ora puoi firmare.' : /** @type {Dict<string>} */ ({ ok: '✅ Il club accetta il rilancio.', firm: '✋ Il club non si muove.', gone: '' })[G.ui.flash.r] || '' : '';
-  var own = W.clubs[st.player.clubId], b = o.bonus;
+  var flash = G.ui.flash && G.ui.flash.id === o.id ? G.ui.flash.clause === 'ok' ? '💥 Pagano la clausola: ora puoi firmare.' : /** @type {Dict<string>} */ ({ ok: '✅ Il club accetta il rilancio.', firm: '✋ Il club non si muove.', gone: '' })[G.ui.flash.r || ''] || '' : '';
+  var own = W.clubs[st.player.clubId], b = G.sure(o.bonus);  // read only with the clause, which comes with it
   var terms = o.clause !== undefined ? '<div class="small muted">Clausola rescissoria ' + o.clause + ' M€ · bonus ' + b.g + ' k€ a gol, ' + b.a + ' k€ a presenza, ' + b.t + ' k€ a trofeo</div>' : '';
   if (o.blocked) return '<div class="offer">' + G.crest(c, 44) + '<div class="grow"><b>' + c.name + '</b> <span class="muted small">' + L.name + ' · forza ' + c.str.toFixed(0) + '</span>' +
     '<div class="small">Offre ' + o.fee + ' M€ e ' + o.wage + ' k€/sett. · ' + G.ROLE_PROMISE[o.role] + '</div>' +
-    '<div class="notice warn small">🔒 Il ' + own.name + ' non ti lascia partire: la tua clausola è di ' + st.player.contract.clause + ' M€.</div>' +
+    '<div class="notice warn small">🔒 Il ' + own.name + ' non ti lascia partire: la tua clausola è di ' + G.sure(st.player.contract).clause + ' M€.</div>' +
     '<div class="row small" style="margin-top:6px">' + (o.tried ? '' : '<button data-act="payclause" data-v="' + o.id + '">💥 Chiedi al ' + c.name + ' di pagare la clausola</button>') +
     '<button class="ghost" data-act="rej" data-v="' + o.id + '">Lascia perdere</button></div></div></div>';
   return '<div class="offer">' + G.crest(c, 44) + '<div class="grow"><b>' + c.name + '</b> <span class="muted small">' + L.name + ' · forza ' + c.str.toFixed(0) + '</span>' +
@@ -31,7 +31,7 @@ G.ui.offerCard = function (st, o) {
 
 /** @param {State} st @returns {string} */
 G.ui.marketTab = function (st) {
-  var p = st.player, W = st.world, club = W.clubs[p.clubId], b = st.S.block, ag = G.life.agent(p);
+  var p = st.player, W = st.world, club = W.clubs[p.clubId], b = G.sure(st.S).block, ag = G.life.agent(p);
   var open = b === 0 || b === 2, offers = st.offers || [], h = '';
   if (G.ui.flash && G.ui.flash.r === 'gone') h += '<div class="notice warn">Il club si è ritirato dalla trattativa.</div>';
   if (G.ui.flash && G.ui.flash.renew) h += '<div class="notice">' + /** @type {Dict<string>} */ ({ ok: 'Il club ti ha proposto un rinnovo.', no: 'Il club non vuole rinnovare ora.', 'già': 'Hai già chiesto il rinnovo in questa finestra.' })[G.ui.flash.renew] + '</div>';
@@ -44,8 +44,8 @@ G.ui.marketTab = function (st) {
     '<p class="muted">' + (open ? 'Nessuna proposta in questa finestra.' : 'Il mercato è chiuso: riapre in Estate e in Inverno (gennaio).') + '</p>';
   G.ui.flash = null;
   var contract = '<div>' + G.ui.club(club.id, 20) + (p.loanFrom !== null ? ' <span class="chip">prestito dal ' + W.clubs[p.loanFrom].name + '</span>' : '') + '</div>' +
-    '<div><b>' + p.contract.wage + ' k€/sett.</b> · ' + Math.max(0, p.contract.years) + ' anni rimasti · ' + G.ROLE_PROMISE[p.contract.role || 'rotazione'] + '</div>' +
-    (G.contracts.ensure(st) && p.contract.clause !== undefined ? '<div class="small">' + G.contracts.text(p.contract) + '</div>' : '') +
+    '<div><b>' + G.sure(p.contract).wage + ' k€/sett.</b> · ' + Math.max(0, G.sure(p.contract).years) + ' anni rimasti · ' + G.ROLE_PROMISE[G.sure(p.contract).role || 'rotazione'] + '</div>' +
+    (G.contracts.ensure(st) && G.sure(p.contract).clause !== undefined ? '<div class="small">' + G.contracts.text(p.contract) + '</div>' : '') +
     (p.captain === club.id ? '<div class="chip cap">©️ Capitano' + (p.capSeasons ? ' · ' + p.capSeasons + (p.capSeasons > 1 ? ' stagioni' : ' stagione') + ' con la fascia in carriera' : '') + '</div>' : '') +
     '<div class="muted">Valore di mercato stimato: ' + G.transfers.value(p) + ' M€</div>' +
     '<p class="muted small">La clausola rescissoria è il prezzo per liberarti: più è bassa, più è facile andare via quando il club non vuole venderti. I bonus si pagano a fine stagione.</p>' +
@@ -71,7 +71,7 @@ G.ui.marketTab = function (st) {
 /** @param {State} st @returns {string} */
 G.ui.lifeTab = function (st) {
   var p = st.player, W = st.world, C = G.CFG, ag = G.life.agent(p), SH = G.SHOP;
-  var net = Math.round(p.contract.wage * C.WEEKS_PER_BLOCK * (1 - C.TAX) * (1 - (ag ? ag.fee / 100 : 0)));
+  var net = Math.round(G.sure(p.contract).wage * C.WEEKS_PER_BLOCK * (1 - C.TAX) * (1 - (ag ? ag.fee / 100 : 0)));
   var money = '<div class="kpis">' + G.ui.kpi(G.ui.money(p.money), 'Conto') + G.ui.kpi(G.ui.money(net), 'Netto a blocco') + G.ui.kpi(G.ui.money(G.life.staffCost(p) / 4), 'Staff a blocco') + (G.life.income(p) ? G.ui.kpi(G.ui.money(G.life.income(p) / 4), 'Rendite a blocco') : '') + G.ui.kpi(G.ui.money(p.invest), 'Investiti') + '</div>' +
     '<div class="row"><button class="ghost" data-act="inv" data-v="1">Investi 1 M€</button><button class="ghost" data-act="inv" data-v="-1">Disinvesti 1 M€</button><span class="muted small">Rendimento medio 5% annuo, con rischio.</span></div>';
   var staff = '<table>' + Object.keys(SH.staff).map(function (k) {
@@ -81,7 +81,7 @@ G.ui.lifeTab = function (st) {
   }).join('') + '</table><p class="muted small">Clicca sul livello attivo per disdire. Se il conto va in rosso lo staff viene licenziato.</p>';
   var items = Object.keys(SH.items).map(function (k) {
     var it = SH.items[k], owned = it.once && p.items[k], done = it.season && p.items.charityYear, lock = p.fame < (it.req || 0);
-    var perks = Object.keys(it.st || {}).map(function (s) { return SH.ITEM_PERK[s] + ' ' + (s === 'trainer' ? '+' : '−') + Math.round(it.st[s] * 100) + '%'; });
+    var perks = Object.keys(it.st || {}).map(function (s) { return SH.ITEM_PERK[s] + ' ' + (s === 'trainer' ? '+' : '−') + Math.round(G.sure(it.st)[s] * 100) + '%'; });
     var fx = ['Morale +' + it.mo].concat(it.fa ? ['fama +' + it.fa] : [], it.fans ? ['affetto di tutti i tuoi tifosi +' + it.fans] : [], perks,
       it.inc ? ['rendita ' + G.ui.money(it.inc) + '/anno'] : [], it.season ? ['una volta a stagione'] : []).join(' · ');
     return '<div class="shop"><b>' + it.n + '</b><div class="small muted">' + fx + '</div>' +
@@ -106,7 +106,7 @@ G.ui.lifeTab = function (st) {
 
 /** @param {State} st @returns {string} */
 G.ui.eventModal = function (st) {
-  var ev = st.event;
+  var ev = G.sure(st.event);
   return '<div class="modal"><div class="card modal-card' + (ev.press ? ' press' : ev.moment || ev.mgrht ? ' moment' : '') + '"><h3>' + (ev.press ? 'Sala stampa' : ev.mgrht ? 'Intervallo' : ev.moment ? 'Momento decisivo' : 'Evento') + '</h3><h2>' + ev.t + '</h2><p>' + ev.d + '</p><div class="stack">' +
     ev.o.map(function (o, i) { return '<button class="' + (i ? 'ghost' : '') + '" data-act="ev" data-v="' + i + '">' + o + '</button>'; }).join('') + '</div></div></div>';
 };

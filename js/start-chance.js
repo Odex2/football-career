@@ -11,7 +11,7 @@ G.season.startParts = function (st) {
   var co = G.coaches.of(W, club), form = p.form * C.FORM_WEIGHT, morale = (p.morale - 50) / 25, coach = co ? (p.rel[co.i] || 0) / C.REL_DIV : 0;
   var young = p.age <= 19 ? C.YOUTH_BONUS : 0, yCoach = co && co.sty === 'giovani' && p.age <= 22 ? 2 : 0, analyst = G.life.staff(p, 'analyst');
   var bonus = form + morale + coach + young + yCoach + analyst;  // the same order of sums as always: same numbers to the last digit
-  var floor = (C.ROLE_FLOOR[p.contract.role] || 0) * (p.form < C.FLOOR_BAD_FORM ? C.FLOOR_CUT : 1);
+  var floor = (C.ROLE_FLOOR[G.sure(p.contract).role] || 0) * (p.form < C.FLOOR_BAD_FORM ? C.FLOOR_CUT : 1);
   return { chance: Math.max(floor, G.sigmoid((p.ovr + bonus - level) / C.MIN_K)), rival: rival, level: level, form: form, morale: morale, coach: coach,
     young: young + yCoach, analyst: analyst, floor: floor };
 };

@@ -129,7 +129,7 @@ G.tro.def = function (name, w) {
   else if (/dell’anno/.test(name)) d = { s: 'statue', m: 'silver' };
   else if (/^Record/.test(name)) d = { s: 'plaque', m: 'silver' };
   else d = { s: 'cup', m: 'silver' };
-  if (w === 1) d.m = G.tro.down[d.m];
+  if (w === 1) d.m = G.tro.down[G.sure(d.m)];  // every branch above gives a metal
   return d;
 };
 

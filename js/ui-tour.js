@@ -6,7 +6,7 @@ G.ui.TOUR_ICON = { WC: '🌎', EURO: '🇪🇺', COPA: '🌎', ASIA: '🌏', AFC
 
 /** @param {Tournament} T @returns {string} */
 G.ui.tourPhase = function (T) {
-  if (T.stage === 'done') return '🏆 ' + G.ui.nat(T.winner) + ' campione';
+  if (T.stage === 'done') return '🏆 ' + G.ui.nat(G.sure(T.winner)) + ' campione';
   if (T.stage === 'g') return 'Fase a gironi · giornata ' + Math.min(3, T.md + 1) + ' di 3';
   return G.tour.ROUND[T.ko.length * 2];
 };
@@ -14,7 +14,7 @@ G.ui.tourPhase = function (T) {
 // The player's side of the tournament: call-up, next match, results so far
 /** @param {State} st @param {Tournament} T @returns {string} */
 G.ui.tourMe = function (st, T) {
-  var p = st.player, me = p.nat, S = st.S, call = S.ntCall, out = T.out[me], opp = G.tour.nextOpp(T, me);
+  var p = st.player, me = p.nat, S = G.sure(st.S), call = S.ntCall, out = T.out[me], opp = G.tour.nextOpp(T, me);
   if (T.teams.indexOf(me) < 0) return '<div class="ts-me"><div class="ts-flag">' + G.ui.flag(me) + '</div><div><h2>' + G.nationInfo(me).name + ' non c’è</h2>' +
     '<p class="muted">La tua nazionale non si è qualificata: segui il torneo da spettatore.</p></div></div>';
   var name = T.n + ' ' + T.year, rows = (S.blockRows || []).filter(function (r) { return r.nt && r.comp === name; });
@@ -36,7 +36,7 @@ G.ui.tourMe = function (st, T) {
 /** @param {State} st @param {Tournament} T @returns {string} */
 G.ui.tourGroups = function (st, T) {
   var me = st.player.nat, idx = T.groups.map(function (g, i) { return i; });
-  idx.sort(function (a, b) { return /** @type {any} */ (T.groups[b].indexOf(me) >= 0) - /** @type {any} */ (T.groups[a].indexOf(me) >= 0); });
+  idx.sort(function (a, b) { return +(T.groups[b].indexOf(me) >= 0) - +(T.groups[a].indexOf(me) >= 0); });
   return '<div class="ts-groups">' + idx.map(function (i) {
     var grp = T.groups[i], mine = grp.indexOf(me) >= 0;
     var rows = G.tour.groupTable(T, grp).map(function (id, pos) {
@@ -51,8 +51,8 @@ G.ui.tourGroups = function (st, T) {
 /** @param {State} st @param {Tournament} T @returns {string} */
 G.ui.tourBracket = function (st, T) {
   var me = st.player.nat, cols = '', n = G.tour.koSize(T);
-  var tie = /** @param {NationCode} a @param {NationCode} b @param {number} [ga] @param {number} [gb] @param {NationCode} [w] @param {any} [pens] */ function (a, b, ga, gb, w, pens) {
-    var side = /** @param {NationCode} id @param {number} [g] */ function (id, g) { return '<div class="' + (w === id ? 'w ' : '') + (id === me ? 'me' : '') + '">' + (id ? G.ui.nat(id) : '<span class="muted">—</span>') + '<b>' + (g === undefined ? '' : g) + '</b></div>'; };
+  var tie = /** @param {NationCode|null} a @param {NationCode|null} b @param {number} [ga] @param {number} [gb] @param {NationCode} [w] @param {boolean} [pens] */ function (a, b, ga, gb, w, pens) {
+    var side = /** @param {NationCode|null} id @param {number} [g] */ function (id, g) { return '<div class="' + (w === id ? 'w ' : '') + (id === me ? 'me' : '') + '">' + (id ? G.ui.nat(id) : '<span class="muted">—</span>') + '<b>' + (g === undefined ? '' : g) + '</b></div>'; };
     return '<div class="ts-tie">' + side(a, ga) + side(b, gb) + (pens ? '<i>rigori</i>' : '') + '</div>';
   };
   for (; n >= 2; n /= 2) {
@@ -70,19 +70,19 @@ G.ui.tourScorers = function (st, T) {
   var p = st.player, ids = Object.keys(T.sc).sort(function (a, b) { return T.sc[b] - T.sc[a]; }).slice(0, 8);
   if (!ids.length) return '<p class="muted">Ancora nessun gol.</p>';
   return '<table>' + ids.map(function (id, i) {
-    var n = id === 'me' ? p.name : st.world.players[/** @type {any} */ (id)].n;
+    var n = id === 'me' ? p.name : st.world.players[+id].n;
     return '<tr class="' + (id === 'me' ? 'me' : '') + '"><td>' + (i + 1) + '</td><td>' + G.ui.flag(T.scN[id]) + ' ' + n + '</td><td class="num"><b>' + T.sc[id] + '</b></td></tr>';
   }).join('') + '</table>';
 };
 
 /** @param {State} st @returns {string} */
 G.ui.tourScreen = function (st) {
-  var S = st.S, p = st.player, keys = Object.keys(S.tours), k = keys.indexOf(G.ui.sel.tour) >= 0 ? G.ui.sel.tour : G.tour.mine(st), T = S.tours[k];
-  var me = p.nat, mineK = G.tour.mine(st), MT = S.tours[mineK], called = S.ntCall && S.ntCall.called;
+  var S = G.sure(st.S), tours = G.sure(S.tours), p = st.player, keys = Object.keys(tours), k = keys.indexOf(G.ui.sel.tour) >= 0 ? G.ui.sel.tour : G.tour.mine(st), T = tours[k];
+  var me = p.nat, mineK = G.tour.mine(st), MT = tours[mineK], called = S.ntCall && S.ntCall.called;
   var alive = MT.teams.indexOf(me) >= 0 && called && !MT.out[me];
-  var allDone = keys.every(function (x) { return S.tours[x].stage === 'done'; });
+  var allDone = keys.every(function (x) { return tours[x].stage === 'done'; });
   var tabs = keys.length > 1 ? '<div class="ts-tabs">' + keys.map(function (x) {
-    return '<button class="' + (x === k ? 'on' : 'ghost') + '" data-act="tsel" data-v="' + x + '">' + G.ui.TOUR_ICON[x] + ' ' + S.tours[x].n + (x === mineK && MT.teams.indexOf(me) >= 0 ? ' ' + G.ui.flag(me) : '') + '</button>';
+    return '<button class="' + (x === k ? 'on' : 'ghost') + '" data-act="tsel" data-v="' + x + '">' + G.ui.TOUR_ICON[x] + ' ' + tours[x].n + (x === mineK && MT.teams.indexOf(me) >= 0 ? ' ' + G.ui.flag(me) : '') + '</button>';
   }).join('') + '</div>' : '';
   var btns = allDone ? '<button class="big" data-act="next">Chiudi la stagione ▶</button>' :
     (alive ? '<button class="big" data-act="match">⚽ Prossima partita</button>' : '') +

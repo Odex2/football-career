@@ -22,7 +22,7 @@ G.ui.tourCard = function (st, T) {
   if (T.stage === 'ko') ko += '<div class="group">Prossimo turno: ' + G.tour.ROUND[T.ko.length * 2] + '</div>' +
     T.ko.map(function (t) { return '<div class="tie' + (t.indexOf(me) >= 0 ? ' mine' : '') + '">' + G.ui.nat(t[0]) + ' vs ' + G.ui.nat(t[1]) + '</div>'; }).join('');
   var sc = Object.keys(T.sc).sort(function (a, b) { return T.sc[b] - T.sc[a]; }).slice(0, 8).map(function (id) {
-    var n = id === 'me' ? p.name : st.world.players[/** @type {any} */ (id)].n;
+    var n = id === 'me' ? p.name : st.world.players[+id].n;
     return '<tr class="' + (id === 'me' ? 'me' : '') + '"><td>' + G.ui.flag(T.scN[id]) + ' ' + n + '</td><td class="num"><b>' + T.sc[id] + '</b></td></tr>';
   }).join('');
   var status = T.winner ? '🏆 Campione: ' + G.ui.nat(T.winner) : T.stage === 'g' ? 'Fase a gironi, giornata ' + T.md + '/3' : 'Eliminazione diretta';
@@ -34,7 +34,7 @@ G.ui.tourCard = function (st, T) {
 
 /** @param {State} st @returns {string} */
 G.ui.nationalTab = function (st) {
-  var p = st.player, n = p.nt, N = G.CFG.NT, S = st.S, co = G.national.coach(st), ch = G.national.chances(st);
+  var p = st.player, n = p.nt, N = G.CFG.NT, S = G.sure(st.S), co = G.national.coach(st), ch = G.national.chances(st);
   var rank = G.NT_IDS.map(function (id) { return /** @type {[NationCode, number]} */ ([id, G.national.str(st, id)]); }).sort(function (a, b) { return b[1] - a[1]; });
   var pos = rank.findIndex(function (x) { return x[0] === p.nat; }) + 1, rel = co ? p.rel[co.i] || 0 : 0;
   var call = S.ntCall ? (S.ntCall.called ? '✅ Convocato nell’ultima finestra' : '❌ Non convocato nell’ultima finestra') : (n.caps ? 'Prossima convocazione' : 'Possibile prima convocazione') + ': finestra d’autunno';
@@ -61,7 +61,7 @@ G.ui.nationalTab = function (st) {
   }).join('') + (pos > 20 ? '<tr class="me"><td>' + pos + '</td><td>' + G.ui.nat(p.nat) + '</td><td class="num">' + rank[pos - 1][1].toFixed(1) + '</td></tr>' : '') + '</table>';
   var live = '';
   if (S.tours) {
-    var keys = Object.keys(S.tours), mine = keys.filter(function (k) { return S.tours[k].teams.indexOf(p.nat) >= 0; })[0];
+    var keys = Object.keys(S.tours), mine = keys.filter(function (k) { return G.sure(S.tours)[k].teams.indexOf(p.nat) >= 0; })[0];
     live = G.ui.tourCard(st, S.tours[mine || keys[0]]);
   }
   return '<div class="grid two">' + G.ui.card(G.ui.nat(p.nat) + ' · ' + pos + 'ª nel ranking', me) +

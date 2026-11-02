@@ -7,7 +7,7 @@ G.ui.signed = function (x, d) { return (x >= 0 ? '+' : '−') + Math.abs(x).toFi
 
 /** @param {Player} p @returns {string[][]} the training focuses as [id, name] */
 G.ui.focusList = function (p) {
-  return [['bal', 'Equilibrato'], ['key', 'Chiave del ruolo']].concat(G.ui.groupsOf(p).map(function (g) { return [g, G.GROUPS[g].name]; }));
+  return [['bal', 'Equilibrato'], ['key', 'Chiave del ruolo'], ['learn', 'Imparare la posizione']].concat(G.ui.groupsOf(p).map(function (g) { return [g, G.GROUPS[g].name]; }));
 };
 
 /** @param {Player} p @returns {string[]} the attribute groups that can be trained (goalkeeping only for a goalkeeper) */
@@ -19,7 +19,7 @@ G.ui.startLabel = function (ch) { return ch >= 0.8 ? 'Titolare fisso' : ch >= 0.
 /** @param {State} st @returns {string} */
 G.ui.profileTab = function (st) {
   return '<div class="grid two prof"><div class="stack">' + G.ui.attrsCard(st) + '</div>' +
-    '<div class="stack">' + G.ui.hierCard(st) + G.ui.focusCard(st) + G.ui.intensityCard(st) + '</div>' +
+    '<div class="stack">' + G.ui.hierCard(st) + G.ui.posCard(st) + G.ui.focusCard(st) + G.ui.intensityCard(st) + '</div>' +
     G.ui.trendCard(st) + '<div class="stack">' + G.ui.injuryCard(st) + G.ui.compareCard(st) + '</div></div>';
 };
 
@@ -27,7 +27,7 @@ G.ui.profileTab = function (st) {
 /** @param {State} st @returns {string} */
 G.ui.trainLine = function (st) {
   var p = st.player, ch = G.season.startChance(st), f = G.ui.focusList(p).filter(function (x) { return x[0] === p.plan.focus; })[0];
-  var t = st.S.block === 4 ? '🏋️ Nel blocco delle finali non ci si allena' : '🏋️ Allenamento: <b>' + (f ? f[1] : '') + '</b> · ' + G.CFG.INTENSITY[p.plan.intensity].name +
+  var t = G.sure(st.S).block === 4 ? '🏋️ Nel blocco delle finali non ci si allena' : '🏋️ Allenamento: <b>' + (f ? f[1] : '') + '</b> · ' + G.CFG.INTENSITY[p.plan.intensity].name +
     ' · previsto OVR ' + G.ui.signed(G.player.preview(p, p.plan.focus, ch * 0.9).ovr);
   return '<div class="trainline clickable" data-act="tab" data-v="profilo">' + t + ' · Gerarchie: <b>' + G.ui.startLabel(ch) + '</b> (' + Math.round(ch * 100) + '%) <span class="go">›</span></div>';
 };
@@ -35,7 +35,7 @@ G.ui.trainLine = function (st) {
 // ---------- 1. attributes ----------
 /** @param {State} st @returns {string} */
 G.ui.attrsCard = function (st) {
-  var p = st.player, C = G.CFG, prev = st.prevAttrs || {}, s0 = st.attrs0, w = G.WEIGHTS[p.role], shift = G.player.trait(p, 'peak', 0);
+  var p = st.player, C = G.CFG, prev = st.prevAttrs || {}, s0 = st.attrs0, w = G.pos.weights(G.pos.of(p)), shift = G.player.trait(p, 'peak', 0);
   var dl = /** @param {number} d */ function (d) { return '<span class="' + (d > 0 ? 'up' : 'down') + '">' + (d > 0 ? '▲' + d : d < 0 ? '▼' + (-d) : '') + '</span>'; };
   var h = '<div class="pa hd' + (s0 ? '' : ' no0') + '"><span></span><span>Val</span><span title="Dall’ultimo blocco">Blocco</span>' +
     (s0 ? '<span title="Dall’inizio della stagione">Stagione</span>' : '') + '<span title="Peso nell’overall del ruolo">Peso</span></div>';
@@ -60,12 +60,12 @@ G.ui.attrsCard = function (st) {
 G.ui.hierCard = function (st) {
   var p = st.player, W = st.world, C = G.CFG, x = G.season.startParts(st), riv = x.rival !== null ? W.players[x.rival] : null, role = G.ROLES[p.role].label;
   var n1 = /** @param {number} v */ function (v) { return G.ui.signed(v, 1); };
-  var me = p.ovr + x.form + x.morale + x.coach + x.young + x.analyst, base = C.ROLE_FLOOR[p.contract.role] || 0;
+  var me = p.ovr + x.form + x.morale + x.coach + x.young + x.analyst, base = C.ROLE_FLOOR[G.sure(p.contract).role] || 0;
   var h = G.ui.pRow('Ultimo titolare ' + role, riv ? riv.n + ' (' + role + ', ' + Math.round(x.level) + ') · tu ' + p.ovr : 'nessuno, il posto è libero · tu ' + p.ovr) +
     G.ui.pRow('Forma', n1(x.form)) + G.ui.pRow('Morale', n1(x.morale)) + G.ui.pRow('Fiducia del mister', n1(x.coach)) +
     (x.young ? G.ui.pRow('Bonus giovani', n1(x.young)) : '') + (x.analyst ? G.ui.pRow('Analista dello staff', n1(x.analyst)) : '') +
     G.ui.pRow('Il tuo valore per il mister', me.toFixed(1).replace('.', ',') + ' contro ' + Math.round(x.level)) +
-    G.ui.pRow('Minimo dal contratto (' + p.contract.role + ')', base ? Math.round(x.floor * 100) + '%' + (x.floor < base ? ' · ridotto per la forma brutta' : '') : 'nessuno');
+    G.ui.pRow('Minimo dal contratto (' + G.sure(p.contract).role + ')', base ? Math.round(x.floor * 100) + '%' + (x.floor < base ? ' · ridotto per la forma brutta' : '') : 'nessuno');
   return G.ui.card('📋 Gerarchie', '<div class="notice">Gerarchie: <b>' + G.ui.startLabel(x.chance) + '</b> · titolare nel <b>' + Math.round(x.chance * 100) + '%</b> delle partite' +
     (base && x.chance === x.floor ? ' (il minimo del contratto)' : '') + '</div>' + h +
     '<p class="muted small">Forma, morale, fiducia e bonus contano come punti di overall. Più il tuo valore supera l’ultimo titolare del ruolo, più giochi.</p>');
@@ -87,7 +87,7 @@ G.ui.focusHint = function (st) {
 /** @param {State} st @returns {string} */
 G.ui.focusCard = function (st) {
   var p = st.player;
-  if (st.S.block === 4) return G.ui.card('🏋️ Focus allenamento', '<p class="muted">Nel blocco delle finali non ci si allena.</p>');
+  if (G.sure(st.S).block === 4) return G.ui.card('🏋️ Focus allenamento', '<p class="muted">Nel blocco delle finali non ci si allena.</p>');
   var share = G.season.startChance(st) * 0.9, groups = G.ui.groupsOf(p), list = G.ui.focusList(p);
   var btn = list.map(function (f) { return '<button data-act="focus" data-v="' + f[0] + '" class="' + (p.plan.focus === f[0] ? 'on' : '') + '">' + f[1] + '</button>'; }).join('');
   var rows = list.map(function (f) {
@@ -111,7 +111,7 @@ G.ui.intensityCard = function (st) {
     return '<tr class="' + (p.plan.intensity === i ? 'me' : '') + '"><td>' + it.name + '</td><td class="num">' + x(it.grow) + '</td><td class="num">' + x(it.inj) + '</td>' +
       '<td class="num">' + x(it.heal || 1) + '</td><td class="num">' + (it.mo ? G.ui.signed(it.mo, 0) : '0') + '</td><td class="num">' + x(it.decl || 1) + '</td></tr>';
   }).join('');
-  return G.ui.card('💪 Intensità', (st.S.block === 4 ? '<p class="muted">Nel blocco delle finali non ci si allena.</p>' :
+  return G.ui.card('💪 Intensità', (G.sure(st.S).block === 4 ? '<p class="muted">Nel blocco delle finali non ci si allena.</p>' :
     '<div class="opts">' + btn + '</div><div class="muted small">' + cur.name + ': ' + cur.desc + '</div>') +
     '<div class="scroll"><table class="cmp"><tr><th>Intensità</th><th class="num">Crescita</th><th class="num">Infortuni</th><th class="num">Guarigione</th><th class="num">Morale</th><th class="num">Declino</th></tr>' + rows + '</table></div>' +
     '<p class="muted small">Morale: punti a ogni blocco. Guarigione: partite di stop recuperate per ogni partita. Declino: dopo l’età del picco.</p>', 'plan');
@@ -130,7 +130,7 @@ G.ui.trendCard = function (st) {
 // ---------- 6. injuries ----------
 /** @param {State} st @returns {string} */
 G.ui.injuryCard = function (st) {
-  var p = st.player, S = st.S, risk = p.traits.filter(function (t) { return G.TRAITS[t].inj; }).map(function (t) { return G.TRAITS[t].name + ' ×' + String(G.TRAITS[t].inj).replace('.', ','); });
+  var p = st.player, S = G.sure(st.S), risk = p.traits.filter(function (t) { return G.TRAITS[t].inj; }).map(function (t) { return G.TRAITS[t].name + ' ×' + String(G.TRAITS[t].inj).replace('.', ','); });
   var rows = p.history.map(function (h) { return '<tr><td>' + G.season.label(h.year) + '</td><td>' + G.ui.club(h.clubId, 16) + '</td><td class="num">' + (h.inj || 0) + '</td></tr>'; }).join('') +
     '<tr><td>' + G.season.label(S.year) + ' <span class="muted small">in corso</span></td><td>' + G.ui.club(p.clubId, 16) + '</td><td class="num">' + S.ps.inj + '</td></tr>';
   return G.ui.card('🚑 Infortuni', (p.inj > 0 ? '<div class="chip bad">🚑 Infortunato: fuori ancora ' + p.inj + (p.inj === 1 ? ' partita' : ' partite') + '</div>' : '<p>✅ Nessun infortunio in corso.</p>') +
@@ -144,7 +144,7 @@ G.ui.injuryCard = function (st) {
 G.ui.compareCard = function (st) {
   var p = st.player, W = st.world, club = W.clubs[p.clubId], n = G.CFG.FORMATION[p.role], L = G.leagueByKey(club.lg), role = G.ROLES[p.role].label, /** @type {number[]} */ os = [];
   W.clubs.forEach(function (c) { if (c.lg === club.lg) G.squads.roleList(W, c, p.role).slice(0, n).forEach(function (id) { os.push(W.players[id].o); }); });
-  var avg = os.length ? Math.round(os.reduce(function (a, b) { return a + b; }, 0) / os.length) : 0, /** @type {Npc|null} */ best = null;
+  var avg = os.length ? Math.round(os.reduce(function (a, b) { return a + b; }, 0) / os.length) : 0, best = /** @type {Npc|null} */ (null);
   W.players.forEach(function (pl) { if (pl && pl.r === p.role && (!best || pl.o > best.o)) best = pl; });
   var top = best ? Math.round(best.o) : 0, rank = os.filter(function (o) { return o > p.ovr; }).length + 1;
   var bar = /** @param {string} l @param {number} v @param {string} [col] */ function (l, v, col) { return '<div class="cmpbar"><span>' + l + '</span><b>' + v + '</b>' + G.ui.meter(v, 100, col) + '</div>'; };

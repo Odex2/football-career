@@ -33,7 +33,7 @@
 );
 
 /** @type {Dict<NtTeam>} */ G.NT = {};
-/** @type {NtDataHost} */ (G.DATA).ntNames.split('|').forEach(function (s) { var x = s.split(':'); G.NT[x[0]] = { id: x[0], name: x[1], flag: x[2] }; });
+/** @type {NtDataHost} */ (G.DATA).ntNames.split('|').forEach(function (s) { var x = s.split(':'); G.NT[x[0]] = /** @type {NtTeam} */ ({ id: x[0], name: x[1], flag: x[2] }); });  // conf and base just below
 /** @type {NtDataHost} */ (G.DATA).ntTeams.split('|').forEach(function (s) {
   var x = s.split(':'), info = G.NT[x[0]] || G.nationInfo(x[0]);
   G.NT[x[0]] = { id: x[0], name: info.name, flag: info.flag, conf: x[1], base: +x[2] };

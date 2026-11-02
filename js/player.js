@@ -5,16 +5,18 @@ G.player = {};
 
 G.player.keys = function () { return G.ATTRS; };
 /** @param {Player} p @param {AttrKey} k */
-G.player.w = function (p, k) { return G.WEIGHTS[p.role][k] || 0; };
+G.player.w = function (p, k) { return G.pos.weights(G.pos.of(p))[k] || 0; };  // the weights of his position (M9 S5)
 
 /** @param {CareerOpts} o @param {Rng} rng @returns {Player} */
 G.player.create = function (o, rng) {
-  var C = G.CFG, goat = C.GOAT[o.goat];
-  var p = /** @type {Player} */ ({ name: o.name, nat: o.nat, role: o.role, foot: o.foot, age: C.START_AGE,
+  var C = G.CFG, goat = C.GOAT[o.goat || 0];
+  // the attributes, overall, stars and the rest are filled below
+  var pos0 = o.pos && G.POS[o.pos] ? o.pos : G.pos.std(o.role, o.foot);
+  var p = /** @type {Player} */ (/** @type {unknown} */ ({ name: o.name, nat: o.nat, role: G.POS[pos0].r, pos: pos0, foot: o.foot, age: C.START_AGE,
     pot: Math.round(goat ? rng.range(goat.pot[0], goat.pot[1]) : rng.range(C.POT_MIN, C.POT_MAX)), attrs: {}, ceil: {}, traits: [],
     morale: C.MORALE_START, form: 0, inj: 0, seasons: 0, history: [], trophies: [],
     tot: { apps: 0, goals: 0, assists: 0 }, clubId: null, loanFrom: null, contract: null,
-    plan: { focus: 'bal', intensity: 1 } });
+    plan: { focus: 'bal', intensity: 1 } }));
   // Scouting band: true potential blurred into a star range (half stars)
   var est = p.pot + rng.range(-4, 4);
   p.stars = G.clamp(Math.round((est - 55) / 8 * 2) / 2, 1, 5);
@@ -42,17 +44,15 @@ G.player.create = function (o, rng) {
         !(t === 'precoce' && p.traits.indexOf('tardivo') >= 0) &&
         !(t === 'tardivo' && p.traits.indexOf('precoce') >= 0)) p.traits.push(t);
   }
+  G.pos.init(p, o.name + ':' + o.nat + ':' + pos0 + ':' + p.pot);  // familiarity, with numbers of its own (M9 S5)
   p.ovr = G.player.ovr(p);
   G.life.init(p);
   return p;
 };
 
 /** @param {Player} p */
-G.player.ovrRaw = function (p) {
-  var s = 0, w = G.WEIGHTS[p.role];
-  Object.keys(w).forEach(function (k) { s += p.attrs[k] * w[k]; });
-  return s;
-};
+// The overall in the position he plays (M9 S5: its weights and familiarity; the 6 roles of before give the same number)
+G.player.ovrRaw = function (p) { return G.pos.ovrAt(p, G.pos.of(p)); };
 /** @param {Player} p */
 G.player.ovr = function (p) { return Math.round(G.player.ovrRaw(p)); };
 
@@ -75,11 +75,11 @@ G.player.grow = function (p, minShare, frac, rng) {
   var ageF = 1;
   for (var y = 0; y < C.GROW_YOUNG.length; y++) if (p.age <= C.GROW_YOUNG[y][0]) { ageF = C.GROW_YOUNG[y][1]; break; }
   if (p.age < 21) ageF *= G.player.trait(p, 'young', 1);
-  else if (p.age <= 25 && p.traits.indexOf('tardivo') >= 0) ageF *= G.TRAITS.tardivo.mid;
+  else if (p.age <= 25 && p.traits.indexOf('tardivo') >= 0) ageF *= G.sure(G.TRAITS.tardivo.mid);
   var declTalent = Math.max(0.4, C.DECL_TALENT - (p.pot - 60) / 60) * G.player.trait(p, 'decl', 1) * (1 - G.life.staff(p, 'nutri'));
   var trainer = 1 + G.life.staff(p, 'trainer');
   var keyAttr = p.role === 'POR' ? 'rif' : 'fin';
-  var focusKeys = G.player.focusKeys(p), fMult = p.plan.focus === 'key' ? C.FOCUS_KEY : C.FOCUS_MULT;
+  var focusKeys = G.player.focusKeys(p), fMult = p.plan.focus === 'key' ? C.FOCUS_KEY : C.FOCUS_MULT, learn = p.plan.focus === 'learn' ? G.CFG2.POS.LEARN_GROW : 1;
   keys.forEach(function (k) {
     var peak = C.PEAK[k] + peakShift, cur = p.attrs[k], d;
     var focus = !focusKeys ? 1 : focusKeys.indexOf(k) >= 0 ? fMult : C.FOCUS_OTHERS;
@@ -87,7 +87,7 @@ G.player.grow = function (p, minShare, frac, rng) {
       var taper = Math.min(1, (peak + 1 - p.age) / 3);
       d = (p.ceil[k] - cur) * C.GROW_RATE * talent * minF * moraleF * intens.grow * focus * ageF * taper * trainer;
       if (k === keyAttr) d *= G.player.trait(p, 'key', 1);
-      d = Math.max(0, d);
+      d = Math.max(0, d) * learn;  // learning a position halves the growth (M9 S5)
     } else {
       var yrs = p.age - peak;
       d = -C.DECL_BASE * Math.pow(yrs, C.DECL_EXP) * C.DECL_MULT[k] * declTalent;
@@ -99,27 +99,26 @@ G.player.grow = function (p, minShare, frac, rng) {
   return p.ovr - before;
 };
 
-/** @param {State} st @param {{ to: RoleKey }} swap */
+// The coach's proposal accepted (M9 S5: a position, js/positions.js)
+/** @param {State} st @param {RoleSwap} swap */
 G.player.setRole = function (st, swap) {
   var p = st.player;
   if (!swap) return;
-  p.roleFrom = p.role; p.role = swap.to; p.ovr = G.player.ovr(p);
-  if (p.plan.focus !== 'bal' && p.plan.focus !== 'key' && !G.GROUPS[p.plan.focus]) p.plan.focus = 'bal';
-  G.news(st, '🔄 Cambi ruolo: ora sei ' + G.ROLES[p.role].name.toLowerCase() + ' (' + Math.round(p.ovr) + ' di overall)');
+  p.roleFrom = p.role;
+  G.pos.set(st, swap.pos || G.pos.std(swap.to, p.foot), 'Accetti la proposta del mister');
 };
 
 /** @param {Player} p @returns {AttrKey[]|null} */
 G.player.focusKeys = function (p) {
-  if (p.plan.focus === 'bal') return null;
-  if (p.plan.focus === 'key') return G.ATTRS.filter(function (k) { return (G.WEIGHTS[p.role][k] || 0) >= G.CFG.FOCUS_KEY_W; });
+  if (p.plan.focus === 'bal' || p.plan.focus === 'learn') return null;
+  if (p.plan.focus === 'key') return G.ATTRS.filter(function (k) { return G.player.w(p, k) >= G.CFG.FOCUS_KEY_W; });
   return G.GROUPS[p.plan.focus].keys;
 };
 
 // Expected attribute change in one block with a given focus (no randomness, nothing changed on the player)
 /** @param {Player} p @param {string} focus @param {number} minShare */
 G.player.preview = function (p, focus, minShare) {
-  var q = /** @type {any} */ ({}), k;
-  for (k in p) q[k] = /** @type {any} */ (p)[k];
+  var q = /** @type {Player} */ (Object.assign({}, p)), k;
   q.attrs = {}; for (k in p.attrs) q.attrs[k] = p.attrs[k];
   q.plan = { focus: focus, intensity: p.plan.intensity };
   G.player.grow(q, minShare, 0.25, /** @type {Rng} */ ({ normal: function () { return 0; } }));

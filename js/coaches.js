@@ -34,7 +34,7 @@ G.coaches.fromPlayer = function (W, pl, rng) {
   return co;
 };
 
-/** @param {World} W @param {Club} club @returns {Coach} */
+/** @param {World} W @param {Club} club @returns {Coach|null} */
 G.coaches.of = function (W, club) { return club && club.coach >= 0 ? W.coaches[club.coach] : null; };
 
 /** @param {World} W @param {Club} club */
@@ -70,7 +70,8 @@ G.coaches.sack = function (st, club, rng, why) {
   co.c = -1; co.rep = Math.max(40, co.rep - 3); club.coach = -1;
   if (club.rep >= 74 || club.id === st.player.clubId) G.news(st, '🔥 ' + club.name + ' esonera ' + co.n + (why ? ' (' + why + ')' : ''));
   if (club.id === st.player.clubId && !st.mgr) G.life.coachLeft(st, co);
-  G.coaches.hire(st, club, rng);
+  var next = G.coaches.hire(st, club, rng);
+  if (st.mgr && !st.mgr.done) G.mgrJobs.vacate(st, club, next);  // a manager career: the manager can still get it (M9 S2)
 };
 
 /** @param {State} st @param {Coach} co @param {Club} club @param {Club|null} old */
@@ -86,7 +87,7 @@ G.coaches.onMove = function (st, co, club, old) {
 // Mid-season (phase 'mid') and end-of-season ('end') sackings based on table vs expectations
 /** @param {State} st @param {string} phase @param {Rng} rng */
 G.coaches.review = function (st, phase, rng) {
-  var W = st.world, S = st.S, C = G.CFG;
+  var W = st.world, S = G.sure(st.S), C = G.CFG;
   G.LEAGUES.forEach(function (L) {
     var lg = S.lg[L.key];
     if (!lg || lg.md < 6) return;
@@ -114,7 +115,7 @@ G.coaches.yearEnd = function (st, rng) {
     co.a++;
     if (co.a >= 71 || (co.a >= 64 && rng.chance(0.25))) {
       co.ret = 1;
-      if (co.c >= 0) { var club = W.clubs[co.c]; club.coach = -1; co.c = -1; G.coaches.hire(st, club, rng); }
+      if (co.c >= 0) { var club = W.clubs[co.c]; club.coach = -1; co.c = -1; var next = G.coaches.hire(st, club, rng); if (st.mgr && !st.mgr.done) G.mgrJobs.vacate(st, club, next); }
     }
   });
   // Ambitious big clubs sometimes upgrade a merely decent coach

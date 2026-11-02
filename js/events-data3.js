@@ -48,20 +48,9 @@ G.events.cards.push(
       ['Più avanti, ora penso al campo', { mo: 1, rel: 1 }, 'Il presidente apprezza.']] }
 );
 
-// Role change proposed by the coach: a neighbouring role where the player keeps most of his overall and plays more
-/** @type {Dict<RoleKey[]>} */
-G.events.SWAP = { ATT: ['ES'], ES: ['ATT', 'TS'], CC: ['DC', 'ES'], TS: ['DC', 'ES'], DC: ['TS'], POR: [] };
+// Role change proposed by the coach: a neighbouring position where the player keeps most of his overall and plays more
 /** @param {State} st @returns {RoleSwap|null} */
-G.events.roleSwap = function (st) {
-  var p = st.player, role = p.role, ovr = p.ovr, now = G.season.startChance(st), /** @type {RoleSwap} */ best = null;
-  G.events.SWAP[role].forEach(function (r) {
-    p.role = r; p.ovr = G.player.ovr(p);
-    var ch = G.season.startChance(st), o = p.ovr;
-    p.role = role; p.ovr = ovr;
-    if (o >= ovr - G.CFG.ROLE_SWAP.OVR && ch >= now + G.CFG.ROLE_SWAP.GAIN && (!best || ch > best.ch)) best = { to: r, ovr: Math.round(o), ch: ch, now: now };
-  });
-  return best;
-};
+G.events.roleSwap = function (st) { return G.pos.proposal(st); };  // M9 S5: a neighbouring position (G.pos.NEAR)
 G.events.cards.push(
   { id: 'rolechange', w: 6, c: function (X) {
       var p = X.p; if (p.roleFrom || X.loan || X.b > 3 || !X.co) return false;

@@ -1,7 +1,7 @@
 // Types for js/national-data.js, js/national.js, js/tournament.js, js/europe.js, js/awards.js (checker only, see types/game.d.ts)
 
 /** A national team in G.NT: name and flag first (G.DATA.ntNames), then confederation and base strength (G.DATA.ntTeams, every team) */
-interface NtTeam { id: NationCode; name: string; flag: string; conf?: string; base?: number }
+interface NtTeam { id: NationCode; name: string; flag: string; conf: string; base: number }
 
 /** G.national._c: real players by nation and role (best first), with the strengths and XIs worked out from them */
 interface NtCache { key: string; W: World; pool: Dict<Dict<PlayerId[]>>; str: Dict<number>; xi: Dict<PlayerId[]> }
@@ -31,6 +31,8 @@ interface AwardEntry {
 }
 
 /** An entry as the roll of honour keeps it (club name instead of id) */
+/** a leaderboard entry with its Ballon d'Or score (G.awards.bdo) */
+interface ScoredEntry extends AwardEntry { score: number }
 interface AwardShort { id: PlayerId | 'me'; n: string; club: string; g: number; a: number; cs: number; avg: number; me: number; pts?: number; score?: number }
 
 /** One season of st.roll (G.awards.season): league awards, champions, European winners, Ballon d'Or top 10, Golden Shoe */

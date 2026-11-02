@@ -57,7 +57,7 @@ G.hof.add = function (st) {
   var p = st.player, sc = G.hof.score(st), list = G.hof.read(), /** @type {string[]} */ clubs = [];
   p.history.forEach(function (h) { if (clubs.indexOf(h.club) < 0) clubs.push(h.club); });
   var big = p.trophies.map(function (t) { return t.name; }).filter(function (n) { return G.hof.TROPHY(n) >= 20; });
-  var /** @type {HofEntry} */ e = { id: st.seed + ':' + p.name, name: p.name, nat: p.nat, role: p.role, from: G.CFG.START_YEAR, to: st.year, seasons: p.seasons,
+  var /** @type {HofEntry} */ e = { id: st.seed + ':' + p.name, name: p.name, nat: p.nat, role: p.role, pos: G.pos.of(p), from: G.CFG.START_YEAR, to: st.year, seasons: p.seasons,
     clubs: clubs, apps: p.tot.apps, goals: p.tot.goals, assists: p.tot.assists, caps: (p.nt || {}).caps || 0,
     trophies: p.trophies.length, big: big, bdo: p.awards.filter(function (a) { return a.name === 'Pallone d’Oro'; }).length,
     score: sc.total, grade: sc.grade, mgr: st.mgr ? G.hof.mgrPart(st.mgr, p) : null, icon: sc.icon, goat: p.goat || 0, peak: Math.max(p.peak || 0, p.ovr), date: Date.now(),
@@ -98,7 +98,7 @@ G.hof.table = function (highlight, n, t) {
   return '<table><tr><th>#</th><th>Giocatore</th><th>Ruolo</th><th>Club</th><th class="num">Gol</th><th class="num">Trofei</th><th class="num">⚽ d’Oro</th><th class="num">Punti</th></tr>' +
     list.slice(0, n || 10).map(function (e, i) {
       return '<tr class="' + (e.id === highlight ? 'me' : '') + '"><td>' + (i + 1) + '</td><td>' + G.ui.flag(e.nat) + ' <b>' + e.name + '</b>' + (e.goat ? ' <span title="GOAT">' + (e.goat > 1 ? '✦✦' : '✦') + '</span>' : '') + ' <span class="muted small">' + e.from + '–' + e.to + '</span></td>' +
-        '<td>' + e.role + '</td><td class="small muted">' + e.clubs.slice(0, 4).join(', ') + (e.clubs.length > 4 ? '…' : '') + '</td><td class="num">' + e.goals + '</td><td class="num">' + e.trophies + '</td>' +
+        '<td>' + (e.pos || e.role) + '</td><td class="small muted">' + e.clubs.slice(0, 4).join(', ') + (e.clubs.length > 4 ? '…' : '') + '</td><td class="num">' + e.goals + '</td><td class="num">' + e.trophies + '</td>' +
         '<td class="num">' + e.bdo + '</td><td class="num"><b>' + e.score + '</b> ' + e.icon + '</td></tr>';
     }).join('') + '</table>';
 };

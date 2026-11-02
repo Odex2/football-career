@@ -1,6 +1,10 @@
 // @ts-check
 // Seeded RNG (mulberry32). State is a single integer, saved with the career.
 
+// For the type checker only: a value that the code knows is there (e.g. st.S during a season), returned as it is
+/** @template T @param {T|null|undefined} x @returns {T} */
+G.sure = function (x) { return /** @type {T} */ (x); };
+
 /** @param {number} seed @returns {Rng} */
 G.makeRng = function (seed) {
   var r = /** @type {Rng} */ ({ s: seed >>> 0 });

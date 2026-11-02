@@ -82,6 +82,10 @@ td.num, th.num { text-align: right; }
 .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 12px 0; }
 .tabs button { background: var(--panel); color: var(--text); border: 1px solid var(--line); font-weight: 600; }
 .tabs button.on { background: var(--accent); color: #062018; border-color: var(--accent); }
+/* on a computer the manager's 12 tabs fit one row (M9 S2) */
+@media (min-width: 701px) { .tabs { gap: 4px; } .tabs button { padding: 7px 8px; font-size: 13px; } }
+/* on a phone the tabs are one row that scrolls sideways (M9 S1) */
+@media (max-width: 700px) { .tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; } .tabs::-webkit-scrollbar { display: none; } .tabs button { flex: none; } }
 .hero .mini { min-width: 170px; display: grid; gap: 4px; font-size: 13px; }
 .grid.two { grid-template-columns: 1fr 1fr; }
 @media (max-width: 1050px) { .grid.two { grid-template-columns: 1fr; } }
@@ -223,3 +227,14 @@ td select { max-width: 260px; font-size: 12px; padding: 3px 4px; }
 .grid > * { min-width: 0; }
 select[data-mxi] { max-width: 100%; }
 @media (max-width: 700px) { .blocks { flex-wrap: wrap; margin-left: 0; } }
+/* 🏛️ Società (M9 S4): folding sections, the confidence block by block, the pact's levels, the requests */
+.soc details > summary { list-style: none; cursor: pointer; }
+.soc details > summary::-webkit-details-marker { display: none; }
+.soc details > summary h3::after { content: ' ▾'; color: var(--muted); }
+.soc details:not([open]) > summary h3 { margin-bottom: 0; }
+.confh { display: flex; align-items: flex-end; gap: 3px; height: 40px; margin-top: 8px; }
+.confh i { flex: 1; max-width: 24px; border-radius: 3px 3px 0 0; }
+.pacts { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px; }
+.pact { border: 1px solid var(--line); border-radius: 10px; padding: 8px; display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.pact.on { border-color: var(--accent); }
+.askrow { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); }

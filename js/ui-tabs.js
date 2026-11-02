@@ -18,15 +18,15 @@ G.ui.leaderTable = function (st, list, key, label, fmt) {
 // ---------- squad ----------
 /** @param {State} st @returns {string} */
 G.ui.squadTab = function (st) {
-  var W = st.world, p = st.player, club = W.clubs[p.clubId], co = G.coaches.of(W, club), S = st.S;
+  var W = st.world, p = st.player, club = W.clubs[p.clubId], co = G.coaches.of(W, club), S = G.sure(st.S);
   var /** @type {Dict<number>} */ xi = {};
-  club.xi.forEach(function (id) { xi[id] = 1; });
+  G.sure(club.xi).forEach(function (id) { xi[id] = 1; });
   var rows = '';
   G.ROLE_KEYS.forEach(function (r) {
     var list = G.squads.roleList(W, club, r).map(function (id) { return W.players[id]; });
     rows += '<tr class="grouprow"><td colspan="9">' + G.ROLES[r].name + '</td></tr>';
     if (r === p.role && !st.mgr) rows += '<tr class="me"><td>' + G.ui.flag(p.nat) + ' ' + p.name + ' (tu)</td><td class="num">' + p.age + '</td><td class="num"><b>' + p.ovr + '</b></td>' +
-      '<td class="num">' + S.ps.apps + '</td><td class="num">' + S.ps.goals + '</td><td class="num">' + S.ps.assists + '</td><td class="num">' + (S.ps.rN ? (S.ps.rSum / S.ps.rN).toFixed(2) : '-') + '</td><td></td><td class="muted small">' + p.contract.role + '</td></tr>';
+      '<td class="num">' + S.ps.apps + '</td><td class="num">' + S.ps.goals + '</td><td class="num">' + S.ps.assists + '</td><td class="num">' + (S.ps.rN ? (S.ps.rSum / S.ps.rN).toFixed(2) : '-') + '</td><td></td><td class="muted small">' + G.sure(p.contract).role + '</td></tr>';
     list.forEach(function (pl) {
       rows += '<tr><td>' + G.ui.flag(pl.nt) + ' ' + pl.n + (xi[pl.i] ? ' <span class="chip">XI</span>' : '') + '</td><td class="num">' + pl.a + '</td><td class="num"><b>' + Math.round(pl.o) + '</b></td>' +
         '<td class="num">' + pl.s[5] + '</td><td class="num">' + pl.s[6] + '</td><td class="num">' + pl.s[7] + '</td><td class="num">' + (pl.s[5] ? (pl.s[9] / pl.s[5]).toFixed(2) : '-') + '</td>' +
@@ -52,7 +52,7 @@ G.ui.squadTab = function (st) {
 G.ui.leagueTab = function (st) {
   var key = G.ui.sel.lg || st.world.clubs[st.player.clubId].lg;
   var opts = G.LEAGUES.map(function (L) { return [L.key, G.NATIONS[L.nat].flag + ' ' + L.name]; });
-  var b = G.awards.leagueBoards(st, key, 10), L = G.leagueByKey(key), cup = st.S.cups[L.nat];
+  var b = G.awards.leagueBoards(st, key, 10), L = G.leagueByKey(key), cup = G.sure(st.S).cups[L.nat];
   var cupTxt = cup.winner !== null ? '🏆 ' + G.ui.club(cup.winner, 16) : cup.alive.length + ' squadre ancora in corsa' + (cup.alive.indexOf(st.player.clubId) >= 0 ? ' (anche la tua)' : '');
   return '<div class="row" style="margin-bottom:10px">' + G.ui.select('lg', opts, key) + '<span class="muted">' + cup.name + ': ' + cupTxt + '</span></div>' +
     '<div class="grid two">' + G.ui.card(L.name, '<div class="scroll">' + G.ui.leagueTable(st, key) + '</div>' +
@@ -65,8 +65,8 @@ G.ui.leagueTab = function (st) {
 // ---------- Europe ----------
 /** @param {State} st @returns {string} */
 G.ui.euroTab = function (st) {
-  var k = G.ui.sel.eu || (G.europe.compsOf(st, st.player.clubId)[0] || 'UCL'), comp = st.S.eu[k];
-  var opts = G.EU_KEYS.map(function (x) { return [x, st.S.eu[x].name]; });
+  var k = G.ui.sel.eu || (G.europe.compsOf(st, st.player.clubId)[0] || 'UCL'), comp = G.sure(st.S).eu[k];
+  var opts = G.EU_KEYS.map(function (x) { return [x, G.sure(st.S).eu[x].name]; });
   var t = G.europe.sortTable(comp), me = st.player.clubId;
   var rows = t.map(function (id, i) {
     var r = comp.tab[id], zone = i < 8 ? 'zone-ucl' : i < 24 ? 'zone-up' : 'zone-down';

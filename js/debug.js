@@ -8,7 +8,7 @@ G.debug = {};
 /** @param {number} i @param {DebugOpts} opts @returns {Dict<any>} */
 G.debug.career = function (i, opts) {
   var roles = Object.keys(G.ROLES), nats = Object.keys(G.NATIONS);
-  var st = G.game.newCareer({ name: 'Sim ' + i, nat: opts.nat || nats[i % nats.length], role: opts.role || roles[i % roles.length],
+  var st = G.game.newCareer({ name: 'Sim ' + i, nat: opts.nat || nats[i % nats.length], role: opts.pos ? G.POS[opts.pos].r : opts.role || roles[i % roles.length], pos: opts.pos,
     foot: 'D', start: i % 3 ? 'second' : 'loan', seed: (opts.seed || 1000) + i });
   st.debug = 1;
   var p = st.player, peak = 0, ovrAt = null, inj = 0;
@@ -24,7 +24,7 @@ G.debug.career = function (i, opts) {
     if (!st.over && (p.age >= (opts.retireAge || 36) || (opts.stopAge && p.age >= opts.stopAge)) && (opts.stopAge || G.game.canRetire(st))) G.game.retire(st);
   }
   p.history.forEach(function (h) { inj += h.inj || 0; });
-  return { role: p.role, pot: p.pot, goals: p.tot.goals, apps: p.tot.apps, trophies: p.trophies.length, peak: peak, ovrAt: ovrAt === null ? p.ovr : ovrAt,
+  return { role: p.role, pos: G.pos.of(p), pot: p.pot, goals: p.tot.goals, assists: p.tot.assists, apps: p.tot.apps, trophies: p.trophies.length, peak: peak, ovrAt: ovrAt === null ? p.ovr : ovrAt,
     retire: p.age, awards: p.awards.length, bdo: p.awards.filter(function (a) { return a.name === 'Pallone d’Oro'; }).length,
     fame: p.fame, money: p.money, inj: inj };
 };

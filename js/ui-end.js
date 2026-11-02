@@ -21,8 +21,9 @@ G.ui.grouped = function (list, icon) {
 };
 
 G.ui.renderEnd = function () {
-  if (G.state.player.mgrOnly) return G.ui.renderMgrEnd(G.state);
-  var st = G.state, p = st.player, W = st.world, sc = G.hof.score(st), nt = p.nt || /** @type {NationalCareer} */ ({ caps: 0, goals: 0, tours: [] });
+  var st = G.sure(G.state);
+  if (st.player.mgrOnly) return G.ui.renderMgrEnd(st);
+  var p = st.player, W = st.world, sc = G.hof.score(st), nt = p.nt || /** @type {NationalCareer} */ ({ caps: 0, goals: 0, assists: 0, rSum: 0, rN: 0, debut: null, tours: [] });
   G.hof.add(st); G.save.write(st);
   var parts = Object.keys(sc.parts).map(function (k) { return '<span class="chip">' + k + ' ' + sc.parts[k] + '</span>'; }).join(' ');
   var tl = p.history.map(function (h, i) {
@@ -49,21 +50,21 @@ G.ui.renderEnd = function () {
   G.ui.countUp(document.getElementById('end-score'));
 };
 
-/** @param {HTMLElement} el */
+/** @param {HTMLElement|null} el */
 G.ui.countUp = function (el) {
   if (!el) return;
-  var to = +el.dataset.to, /** @type {number} */ t0 = null, dur = 1600;
+  var to = +G.sure(el.dataset.to), /** @type {number|null} */ t0 = null, dur = 1600;
   var step = /** @param {number} t */ function (t) {
     if (t0 === null) t0 = t;
     var k = Math.min(1, (t - t0) / dur);
-    el.textContent = /** @type {any} */ (Math.round(to * (1 - Math.pow(1 - k, 3))));
+    el.textContent = String(Math.round(to * (1 - Math.pow(1 - k, 3))));
     if (k < 1) requestAnimationFrame(step);
   };
   requestAnimationFrame(step);
 };
 
 // The Hall of Fame card: two tabs, players and managers, each with its own ranking; a tab is redrawn in place
-/** @param {string|null} hl @param {number} n @param {string} t @param {string} cls @returns {string} */
+/** @param {string|null|undefined} hl @param {number} n @param {string} t @param {string} cls @returns {string} */
 G.ui.hofCard = function (hl, n, t, cls) {
   var tabs = [['pl', '⚽ Calciatori'], ['mgr', '📋 Manager']].map(function (x) { return '<button data-act="hoft" data-v="' + x[0] + '" class="' + (t === x[0] ? 'on' : 'ghost') + '">' + x[1] + '</button>'; }).join('');
   return '<div class="card ' + cls + '" id="hof" data-hl="' + (hl || '') + '" data-n="' + n + '" data-cls="' + cls + '"><h3>🏛️ Hall of Fame</h3><div class="opts">' + tabs + '</div>' +

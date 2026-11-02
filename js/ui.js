@@ -5,13 +5,15 @@ G.ui = {};
 G.ui.tab = 'carriera';
 /** @type {{ [key: string]: any }} filters chosen in the tabs: league, cup, year, role */
 G.ui.sel = {};
-/** @type {{ id?: number, r?: string, clause?: string, renew?: string, mgr?: string } | null} the outcome of a market action, shown once */
+/** @type {{ id?: number, r?: string, clause?: string|null, renew?: string, mgr?: string } | null} the outcome of a market action, shown once */
 G.ui.flash;
+/** @type {{ club: ClubId, a: Dict<string> } | null | undefined} the interview being answered (M9 S3): only for the day, never saved */
+G.ui.iv;
 /** @type {number} hidden GOAT switch of the creation screen: 0 off, 1 = 1 in 100, 2 = 1 in 1000 */
 G.ui.goat;
 /** @type {string} career picked on the creation screen ('mgr' = manager) */
 G.ui.ctype;
-/** @type {State} the career being played (none on the creation screen) */
+/** @type {State|null|undefined} the career being played (none on the creation screen) */
 G.state;
 /** @param {string} s @returns {any} */
 var $ = function (s) { return document.querySelector(s); };
@@ -28,7 +30,7 @@ G.ui.boot = function () {
       if (err) return alert('Import non riuscito: ' + err.message);
       var x = G.save.info(G.save.slot);
       if (x && !confirm('La carriera del file va nello slot ' + (G.save.slot + 1) + ', al posto di quella di ' + x.name + '. Continuare?')) return;
-      G.state = G.save.restore(st); G.save.write(G.state); G.ui.render();
+      var s = G.save.restore(G.sure(st)); G.state = s; G.save.write(s); G.ui.render();  // no error: the file was read
     });
     e.target.value = '';
   };
@@ -39,7 +41,7 @@ G.ui.render = function () {
   if (!st) return G.ui.renderCreate();
   if (st.over) return G.ui.renderEnd();
   if (st.mgr) return G.ui.renderMgr(st);
-  if (st.S.block === 5 && !st.recap) { $('#app').innerHTML = G.ui.tourScreen(st) + (st.event ? G.ui.eventModal(st) : ''); return; }
+  if (G.sure(st.S).block === 5 && !st.recap) { $('#app').innerHTML = G.ui.tourScreen(st) + (st.event ? G.ui.eventModal(st) : ''); return; }
   var tabs = [['carriera', '⚽ Carriera'], ['profilo', '🧬 Profilo'], ['squadra', '👥 Squadra'], ['campionati', '📊 Campionati'], ['calendario', '📅 Calendario'], ['europa', '🌍 Europa'], ['nazionale', G.ui.flag(st.player.nat) + ' Nazionale'],
     ['mercato', '💼 Mercato' + ((st.offers || []).length ? ' (' + st.offers.length + ')' : '')], ['vita', '💶 Vita'], ['premi', '🏅 Premi'], ['bacheca', '🏆 Bacheca'], ['stats', '📈 Statistiche']];
   var bar = '<nav class="tabs">' + tabs.map(function (t) { return '<button data-act="tab" data-v="' + t[0] + '" class="' + (G.ui.tab === t[0] ? 'on' : '') + '">' + t[1] + '</button>'; }).join('') + '</nav>';
@@ -59,10 +61,11 @@ G.ui.onClick = function (e) {
   if (act === 'slotgo' || act === 'slotdel') return G.ui.slotAct(act, +v);
   if (act === 'hoft') return G.ui.hofTab(v);
   if (act === 'cab' || act === 'cabsel') return G.ui.cabAct(el, act, v, w);
-  var mr = st && (G.ui.pitchAct(st, act, v) || G.ui.homeAct(st, act, v) || G.ui.calAct(st, act, v) || G.ui.mgrSqAct(st, act, v) || G.ui.mgrDealAct(st, act, v) || G.ui.mgrYouthAct(st, act, v) || G.ui.mgrBoardAct(st, act, v) || G.ui.mgrAct(st, act, v, w));
+  var mr = st && (G.ui.pitchAct(st, act, v) || G.ui.homeAct(st, act, v) || G.ui.calAct(st, act, v) || G.ui.mgrSqAct(st, act, v) || G.ui.mgrDealAct(st, act, v) || G.ui.mgrYouthAct(st, act, v) || G.ui.mgrBoardAct(st, act, v) || G.ui.posAct(st, act, v) || G.ui.mgrTacAct(st, act, v) || G.ui.societyAct(st, act, v) || G.ui.mgrAct(st, act, v, w));
   if (mr === 'stop') return;
-  if (mr) { if (mr !== 'view') G.save.write(st); if (mr === true) window.scrollTo(0, 0); return G.ui.render(); }
+  if (mr) { if (mr !== 'view') G.save.write(G.sure(st)); if (mr === true) window.scrollTo(0, 0); return G.ui.render(); }
   if (act === 'tab') { G.ui.tab = v; return G.ui.render(); }
+  if (!st) return;  // every action below belongs to a career
   if (act === 'goal') G.goals.pick(st, +v);
   if (act === 'focus') st.player.plan.focus = v;
   if (act === 'intensity') st.player.plan.intensity = +v;
@@ -104,7 +107,7 @@ G.ui.onChange = function (e) {
 // ---------- helpers ----------
 /** @param {ClubId} id @param {number} [size] @returns {string} */
 G.ui.club = function (id, size) {
-  var c = G.state.world.clubs[id];
+  var c = G.sure(G.state).world.clubs[id];
   return '<span class="club">' + G.crest(c, size || 20) + c.name + '</span>';
 };
 /** @param {number} n @returns {string} */
@@ -130,11 +133,11 @@ G.ui.card = function (title, body, cls) { return '<div class="card ' + (cls || '
 // ---------- creation ----------
 G.ui.renderCreate = function () {
   if (G.ui.ctype === 'mgr') { $('#app').innerHTML = G.ui.mgrCreateForm(); return; }
-  var roles = Object.keys(G.ROLES).map(function (r) { return '<option value="' + r + '"' + (r === 'ATT' ? ' selected' : '') + '>' + G.ROLES[r].label + ' · ' + G.ROLES[r].name + '</option>'; }).join('');
+  var roles = G.ui.posOptions();  // the 11 positions (M9 S5)
   $('#app').innerHTML = '<div class="card create"><h3>Nuova carriera</h3>' + G.ui.careerSwitch() +
     '<label>Nome</label><input id="c-name" value="Marco Rossi" maxlength="30">' +
     '<label>Nazione</label><select id="c-nat">' + G.ui.natOptions('ITA') + '</select><p class="muted small" id="c-natnote"></p>' +
-    '<label>Ruolo</label><select id="c-role">' + roles + '</select>' +
+    '<label>Posizione</label><select id="c-role">' + roles + '</select>' +
     '<label>Piede</label><select id="c-foot"><option value="D">Destro</option><option value="S">Sinistro</option><option value="A">Ambidestro</option></select>' +
     '<label>Inizio</label><select id="c-start"><option value="random" selected>Club casuale (di solito una squadra piccola, rarissimo un top club)</option><option value="loan">In prestito da un grande club</option></select>' +
     '<p class="muted small">Circa 1 volta su 2 si parte da una seconda divisione; un top club è questione di fortuna.</p>' +
@@ -145,7 +148,7 @@ G.ui.renderCreate = function () {
 G.ui.create = function () {
   var slot = G.ui.pickSlot(), name = $('#c-name').value.trim() || 'Giocatore';
   if (slot < 0) return;
-  G.state = G.game.newCareer({ name: name, nat: $('#c-nat').value, role: $('#c-role').value, foot: $('#c-foot').value, start: $('#c-start').value, goat: G.ui.goat || 0 });
+  G.state = G.game.newCareer({ name: name, nat: $('#c-nat').value, pos: $('#c-role').value, role: G.POS[$('#c-role').value].r, foot: $('#c-foot').value, start: $('#c-start').value, goat: G.ui.goat || 0 });
   G.ui.goat = 0;
   G.ui.tab = 'carriera';
   G.save.slot = slot; G.save.write(G.state); G.ui.render();
@@ -154,13 +157,13 @@ G.ui.create = function () {
 // ---------- header ----------
 /** @param {State} st @returns {string} */
 G.ui.hero = function (st) {
-  var p = st.player, S = st.S, club = st.world.clubs[p.clubId], C = G.CFG, L = G.leagueByKey(club.lg);
+  var p = st.player, S = G.sure(st.S), club = st.world.clubs[p.clubId], C = G.CFG, L = G.leagueByKey(club.lg);
   var co = G.coaches.of(st.world, club), ag = G.life.agent(p);
   var blocks = C.BLOCKS.map(function (b, i) { return i < 5 || S.tours ? '<span class="' + (i < S.block ? 'done' : i === S.block ? 'cur' : '') + '">' + C.BLOCK_ICONS[i] + ' ' + b + '</span>' : ''; }).join('');
   return '<div class="card hero">' + G.crest(club, 56) +
     '<div class="ovr">' + p.ovr + '<small>OVERALL</small></div>' +
     '<div><h2>' + p.name + ' <span class="muted">' + G.ui.flag(p.nat) + '</span></h2>' +
-    '<div class="muted">' + G.ROLES[p.role].label + ' · ' + p.age + ' anni · ' + G.ui.stars(p.stars) + '</div>' +
+    '<div class="muted">' + G.pos.label(p) + ' · ' + p.age + ' anni · ' + G.ui.stars(p.stars) + '</div>' +
     '<div>' + club.name + ' · ' + L.name + (p.loanFrom !== null ? ' <span class="chip">prestito</span>' : '') + (p.bandiera[club.id] ? ' <span class="chip">🚩 bandiera</span>' : '') + (p.captain === club.id ? ' <span class="chip cap">©️ capitano</span>' : '') + '</div>' +
     '<div class="muted">' + (co ? 'All. ' + co.n + ' · rapporto ' + (p.rel[co.i] || 0) : 'Senza allenatore') + '</div></div>' +
     '<div class="mini"><div>Morale ' + p.morale + G.ui.meter(p.morale) + '</div><div>Fama ' + Math.round(p.fame) + G.ui.meter(p.fame, 100, 'var(--accent2)') + '</div>' +
@@ -179,8 +182,8 @@ G.ui.career = function (st) {
 
 /** @param {State} st @returns {string} */
 G.ui.planCard = function (st) {
-  var p = st.player, S = st.S, C = G.CFG, b = S.block;
-  var isFinal = b === 4, h = '', tours = S.tours ? Object.keys(S.tours).map(function (k) { return S.tours[k].n; }).join(', ') : '';
+  var p = st.player, S = G.sure(st.S), C = G.CFG, b = S.block;
+  var isFinal = b === 4, h = '', tours = S.tours ? Object.keys(S.tours).map(function (k) { return G.sure(S.tours)[k].n; }).join(', ') : '';
   (st.achNew || []).forEach(function (id) { var a = G.ach.get(id); h += '<div class="notice ach">' + a[1] + ' <b>Obiettivo sbloccato: ' + a[2] + '</b> <span class="muted small">' + a[3] + '</span></div>'; });
   if (st.eventResult) h += '<div class="notice">🗒️ <b>' + st.eventResult.t + '</b>: ' + st.eventResult.r + '</div>';
   h += G.ui.goalBox(st);
@@ -238,7 +241,7 @@ G.ui.summaryCard = function (st) {
 
 /** @param {State} st @param {LeagueKey} key @param {boolean} [compact] @returns {string} */
 G.ui.leagueTable = function (st, key, compact) {
-  var p = st.player, L = G.leagueByKey(key), S = st.S;
+  var p = st.player, L = G.leagueByKey(key), S = G.sure(st.S);
   var ids = G.season.sortTable(S, key), tab = S.lg[key].tab, n = ids.length, promo = G.CFG.PROMO_SLOTS, hasLow = !!S.lg[L.nat + '2'];
   var acc = G.CFG.UEFA_ACCESS[L.nat], eu = L.tier === 1 && acc ? acc[0] + acc[1] + acc[2] : 0, less = G.cal.behind(st, key);
   var rows = ids.map(function (id, i) {
@@ -261,7 +264,7 @@ G.ui.tableCard = function (st) {
 /** @param {Player} p @returns {string} */
 G.ui.historyTable = function (p) {
   var rows = p.history.map(function (h) {
-    return '<tr><td>' + G.season.label(h.year) + '</td><td>' + h.age + '</td><td>' + G.ui.club(h.clubId, 16) + (h.loan ? ' <span class="chip">prestito</span>' : '') + '</td>' +
+    return '<tr><td>' + G.season.label(h.year) + '</td><td>' + h.age + '</td><td>' + G.ui.club(h.clubId, 16) + (h.loan ? ' <span class="chip">prestito</span>' : '') + (h.posK ? ' <span class="muted small">' + h.posK + '</span>' : '') + '</td>' +
       '<td class="muted">' + h.lg + '</td><td class="num">' + h.pos + 'º</td><td class="num">' + h.apps + (h.matches ? '<span class="muted">/' + h.matches + '</span>' : '') + '</td><td class="num">' + h.goals + '</td>' +
       '<td class="num">' + h.assists + '</td><td class="num ' + G.ui.rcls(h.avg) + '">' + (h.avg ? h.avg.toFixed(2) : '-') + '</td><td class="num">' + h.ovr + '</td>' +
       '<td class="small">' + h.trophies.concat(h.awards || []).map(function (t) { return G.ui.troTag(t); }).join(' ') +

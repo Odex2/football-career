@@ -2,7 +2,9 @@
 // National teams: strength from real player pools, the ct, call-ups, international windows,
 // qualification and the end-of-tournament wrap-up (trophies, awards, Ballon d'Or bonus).
 
-G.national = {}; /** @type {NtCache} */ G.national._c = null;
+G.national = {};
+/** @type {NtCache|null} */
+G.national._c = null;
 
 /** @param {NationCode} nat */
 G.national.name = function (nat) { var t = G.NT[nat] || G.nationInfo(nat); return t.flag + ' ' + t.name; };
@@ -19,7 +21,7 @@ G.national.init = function (st) {
 // Real players by nation and role, best first; cached for half a season
 /** @param {State} st @returns {NtCache} */
 G.national.pools = function (st) {
-  var W = st.world, key = st.S.year + ':' + (st.S.block >= 2 ? 1 : 0), c = G.national._c;
+  var W = st.world, key = G.sure(st.S).year + ':' + (G.sure(st.S).block >= 2 ? 1 : 0), c = G.national._c;
   if (c && c.key === key && c.W === W) return c;
   /** @type {Dict<Dict<PlayerId[]>>} */ var pool = {};
   W.players.forEach(function (pl) {
@@ -85,10 +87,11 @@ G.national.chances = function (st) {
 
 /** @param {State} st @param {string} [what] */
 G.national.callUp = function (st, what) {
-  if (st.mgr) { st.S.ntCall = { called: false, start: 0 }; return false; }
-  var p = st.player, ch = G.national.chances(st), was = st.S.ntCall && st.S.ntCall.called;
+  var S = G.sure(st.S);
+  if (st.mgr) { S.ntCall = { called: false, start: 0 }; return false; }
+  var p = st.player, ch = G.national.chances(st), was = S.ntCall && S.ntCall.called;
   var called = G.rng.chance(ch.call);
-  st.S.ntCall = { called: called, start: ch.start };
+  S.ntCall = { called: called, start: ch.start };
   G.captain.national(st, called);
   if (called && !p.nt.caps && !p.nt.called) { p.nt.called = 1; G.news(st, '📞 Prima convocazione con ' + G.national.name(p.nat) + '!'); }
   else if (called && what) G.news(st, '📞 Convocato per ' + what);
@@ -97,7 +100,7 @@ G.national.callUp = function (st, what) {
 };
 
 // Goals and assists of one national side; returns the main player's share when he plays
-/** @param {State} st @param {Tournament} T @param {NationCode} nat @param {number} goals @param {NtPlay} mp */
+/** @param {State} st @param {Tournament|undefined} T @param {NationCode} nat @param {number} goals @param {NtPlay|null} mp */
 G.national.scorers = function (st, T, nat, goals, mp) {
   var C = G.CFG, W = st.world, rng = G.rng, p = st.player, /** @type {(PlayerId|'me')[]} */ ids = G.national.xi(st, nat).slice(),
     /** @type {number[]} */ gw = [], /** @type {number[]} */ aw = [], /** @type {number[]} */ g = [], /** @type {number[]} */ a = [];
@@ -108,7 +111,7 @@ G.national.scorers = function (st, T, nat, goals, mp) {
   });
   var me = mp && mp.mins > 0 ? ids.length : -1;
   if (me >= 0) {
-    var A = p.attrs, f = mp.mins / 90, ref = G.match.ref(p.role);
+    var A = p.attrs, f = G.sure(mp).mins / 90, ref = G.match.ref(p.role);
     ids.push('me'); g.push(0); a.push(0);
     var eff = G.match.mainEff(p);
     gw.push(C.GOAL_W[p.role] * Math.exp((eff[0] - avg) / C.QUAL_DIV) * f);
@@ -127,7 +130,7 @@ G.national.scorers = function (st, T, nat, goals, mp) {
 // One national-team match; neutral venue unless it is a window match (a plays at home)
 /** @param {State} st @param {NationCode} a @param {NationCode} b @param {NtComp} comp @param {Tournament} [T] */
 G.national.match = function (st, a, b, comp, T) {
-  var C = G.CFG, rng = G.rng, p = st.player, call = st.S.ntCall;
+  var C = G.CFG, rng = G.rng, p = st.player, call = G.sure(st.S).ntCall;
   var mine = a === p.nat ? 'a' : b === p.nat ? 'b' : null, mp = null;
   if (mine && call && call.called) {
     mp = p.inj > 0 ? { mins: 0 } : rng.chance(call.start) ? { mins: rng.chance(0.7) ? 90 : rng.int(60, 89), start: true } :
@@ -154,7 +157,7 @@ G.national.record = function (st, home, opp, r, mp, ga, comp, T) {
     if (mp.mins < 45) x = 6 + (x - 6) * 0.5;
     row.r = Math.round(G.clamp(x, 4, 10) * 10) / 10;
     var n = p.nt;
-    if (!n.caps) { n.debut = st.S.year; G.news(st, '🎽 Esordio con ' + G.national.name(p.nat) + ' contro ' + G.national.name(opp)); }
+    if (!n.caps) { n.debut = G.sure(st.S).year; G.news(st, '🎽 Esordio con ' + G.national.name(p.nat) + ' contro ' + G.national.name(opp)); }
     n.caps++; n.goals += row.g; n.assists += row.a; n.rSum += row.r; n.rN++;
     if (row.g && n.goals === row.g) G.news(st, '⚽ Primo gol in nazionale contro ' + G.national.name(opp));
     if (T) { T.my.apps++; T.my.g += row.g; T.my.a += row.a; }
@@ -162,14 +165,14 @@ G.national.record = function (st, home, opp, r, mp, ga, comp, T) {
     var co = G.national.coach(st);
     if (co) p.rel[co.i] = Math.round(G.clamp((p.rel[co.i] || 0) + (row.r - 6.4) * 2, -100, 100));
   }
-  if (st.S.today !== undefined) row.dt = st.S.today;
-  st.S.blockRows.push(row);
+  if (G.sure(st.S).today !== undefined) row.dt = G.sure(st.S).today;
+  G.sure(st.S).blockRows.push(row);
 };
 
 // Next tournament for the player's nation: summer year and key
 /** @param {State} st */
 G.national.nextTour = function (st) {
-  var Y = st.S.year + 1, year = Y % 2 ? Y + 1 : Y, conf = G.NT[st.player.nat].conf;
+  var Y = G.sure(st.S).year + 1, year = Y % 2 ? Y + 1 : Y, conf = G.NT[st.player.nat].conf;
   return { year: year, key: year % 4 === 2 ? 'WC' : G.CFG.NT.CONT[conf] };
 };
 
@@ -178,20 +181,20 @@ G.national.nextTour = function (st) {
 G.national.window = function (st, b) {
   var p = st.player, N = G.CFG.NT, rng = G.rng, me = G.NT[p.nat];
   if (!me) return;
-  var nx = G.national.nextTour(st), friendly = nx.year === st.S.year + 1 && b === 3;
+  var nx = G.national.nextTour(st), friendly = nx.year === G.sure(st.S).year + 1 && b === 3;
   var tn = N.TOURS[nx.key].n, name = friendly ? 'Amichevole' : 'Qualificazioni ' + tn;
   G.national.callUp(st);
   if (!friendly && (!st.ntq || st.ntq.key !== nx.key || st.ntq.year !== nx.year)) st.ntq = { key: nx.key, year: nx.year, pts: 0, n: 0 };
   var pool = G.NT_IDS.filter(function (id) { return id !== p.nat && (friendly || G.NT[id].conf === me.conf); })
     .sort(function (x, y) { return Math.abs(G.NT[x].base - me.base) - Math.abs(G.NT[y].base - me.base); }).slice(0, 10);
   // with a calendar the window is called on the break's first day (a Monday): the matches on Thursday, Sunday, Tuesday
-  var S = st.S, t0 = S.today;
+  var S = G.sure(st.S), t0 = S.today;
   for (var k = 0; k < N.WINDOW; k++) {
     if (t0 !== undefined) S.today = t0 + ([3, 6, 8][k] || 8);
     var opp = rng.pick(pool), home = k % 2 === 0, res = G.national.match(st, home ? p.nat : opp, home ? opp : p.nat, { name: name });
     if (friendly) continue;
     var gf = home ? res[0] : res[1], gc = home ? res[1] : res[0];
-    st.ntq.n++; st.ntq.pts += gf > gc ? 3 : gf === gc ? 1 : 0;
+    var q = G.sure(st.ntq); q.n++; q.pts += gf > gc ? 3 : gf === gc ? 1 : 0;  // set above for the qualifiers
   }
   S.today = t0;
 };
@@ -199,9 +202,9 @@ G.national.window = function (st, b) {
 // Start of the winter block in a tournament season: who qualifies
 /** @param {State} st */
 G.national.qualify = function (st) {
-  var N = G.CFG.NT, S = st.S, p = st.player, rng = G.rng, Y = S.year + 1;
+  var N = G.CFG.NT, S = G.sure(st.S), p = st.player, rng = G.rng, Y = S.year + 1;
   if (Y % 2 || S.tours) return;
-  S.tours = {};
+  var /** @type {Dict<Tournament>} */ tours = S.tours = {};
   var keys = Y % 4 === 2 ? ['WC'] : ['EURO', 'COPA', 'ASIA', 'AFCON'];
   keys.forEach(function (key) {
     var D = N.TOURS[key], /** @type {NationCode[]} */ teams = [];
@@ -211,7 +214,7 @@ G.national.qualify = function (st) {
         return { id: id, s: G.national.str(st, id) + rng.normal() * N.QUAL_NOISE + q };
       }).sort(function (a, b) { return b.s - a.s; }).slice(0, D.q[conf]).map(function (x) { return x.id; }));
     });
-    S.tours[key] = G.tour.create(st, key, teams);
+    tours[key] = G.tour.create(st, key, teams);
     var eligible = D.q[G.NT[p.nat].conf];
     if (eligible) G.news(st, (teams.indexOf(p.nat) >= 0 ? '✅ ' : '❌ ') + G.national.name(p.nat) + (teams.indexOf(p.nat) >= 0 ? ' è qualificata al ' : ' non si qualifica al ') + D.n + ' ' + Y);
   });

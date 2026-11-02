@@ -23,7 +23,7 @@ G.mgrDeal.r1 = function (x) { return Math.round(x * 10) / 10; };
 // assistant renews contracts and looks after the academy, the market is left to you (G1)
 /** @param {State} st */
 G.mgrDeal.start = function (st) {
-  var m = st.mgr, sq = st.world.clubs[m.club].sq;
+  var m = G.mgr.job(st), sq = st.world.clubs[m.club].sq;
   m.rep2 = m.rep2 || {}; m.neg = m.neg || {}; m.deal = null; m.split = 0; m.wageRoom = 0; m.loans = m.loans || {};
   m.bids = (m.bids || []).filter(function (b) { return sq.indexOf(b.id) >= 0; });
   m.assist = m.assist || { contracts: 1, market: 0, youth: 1 };
@@ -33,14 +33,14 @@ G.mgrDeal.start = function (st) {
 // The weakest starter of role r in our XI: the yardstick of the scouts (as in G.mgr.targets)
 /** @param {State} st @param {RoleKey} r @returns {number} */
 G.mgrDeal.weak = function (st, r) {
-  var m = st.mgr, W = st.world, list = G.squads.roleList(W, W.clubs[m.club], r), n = Math.max(1, G.mgrTeam.FORMS[m.form || '4-4-2'].s[r] || 1);
+  var m = G.mgr.job(st), W = st.world, list = G.squads.roleList(W, W.clubs[m.club], r), n = Math.max(1, G.mgrTeam.FORMS[m.form || '4-4-2'].s[r] || 1);
   return list[n - 1] !== undefined ? W.players[list[n - 1]].o : 40;
 };
 
 // RESULTS players for filter f, best first; the same filter in the same window gives the same players
 /** @param {State} st @param {DealFilter} f @returns {Npc[]} */
 G.mgrDeal.search = function (st, f) {
-  var m = st.mgr, W = st.world, S = st.S, club = W.clubs[m.club], bud = Math.max(0, club.bud), bk = G.transfers.buckets(W);
+  var m = G.mgr.job(st), W = st.world, S = G.sure(st.S), club = W.clubs[m.club], bud = Math.max(0, club.bud), bk = G.transfers.buckets(W);
   var rng = G.makeRng(G.mgrDeal.hash(st.seed + ':' + S.year + ':' + S.block + ':' + JSON.stringify(f))), /** @type {{ pl: Npc, sc: number }[]} */ out = [];
   (f.r ? [f.r] : G.ROLE_KEYS).forEach(function (r) {
     var weak = G.mgrDeal.weak(st, r);
@@ -62,7 +62,7 @@ G.mgrDeal.search = function (st, f) {
 // holding the true value); our own players' is exact
 /** @param {State} st @param {Npc} pl @returns {[number, number]} */
 G.mgrDeal.pot = function (st, pl) {
-  var D = G.CFG2.MGR_DEAL, m = st.mgr;
+  var D = G.CFG2.MGR_DEAL, m = G.mgr.job(st);
   if (pl.c === m.club) return [Math.round(pl.p), Math.round(pl.p)];
   var w = m.rep2 && m.rep2[pl.i] ? D.POT_SCOUTED : D.POT_FOG, off = Math.round(((pl.i * 7919) % 7 - 3) * w / D.POT_FOG);
   return [Math.max(Math.round(pl.o), Math.round(pl.p + off - w)), Math.min(99, Math.round(pl.p + off + w))];
@@ -71,7 +71,7 @@ G.mgrDeal.pot = function (st, pl) {
 // "📋 Relazione completa": at most REPORTS a window
 /** @param {State} st @param {PlayerId} id @returns {string} */
 G.mgrDeal.report = function (st, id) {
-  var m = st.mgr, pl = st.world.players[id];
+  var m = G.mgr.job(st), pl = st.world.players[id];
   if (!pl || !G.mgr.open(st) || m.rep2[id]) return '';
   if (Object.keys(m.rep2).length >= G.CFG2.MGR_DEAL.REPORTS) return 'Gli osservatori hanno finito le relazioni per questa finestra.';
   m.rep2[id] = 1;
@@ -86,7 +86,7 @@ G.mgrDeal.traits = function (pl) {
 // The squad role he would get with us (B1): the roles with him in the squad
 /** @param {State} st @param {Npc} pl @returns {SquadRole} */
 G.mgrDeal.deserve = function (st, pl) {
-  var m = st.mgr, club = st.world.clubs[m.club];
+  var m = G.mgr.job(st), club = st.world.clubs[m.club];
   if (pl.c === club.id) return m.sr[pl.i] || 'ris';
   club.sq.push(pl.i);
   var r = G.mgrSq.roles(st)[pl.i];
@@ -97,7 +97,7 @@ G.mgrDeal.deserve = function (st, pl) {
 // The chance his club takes an offer at FEE[k] of the price (k = 3: the loan, judged like the full price)
 /** @param {State} st @param {Npc} pl @param {number} k @returns {number} */
 G.mgrDeal.clubP = function (st, pl, k) {
-  var D = G.CFG2.MGR_DEAL, W = st.world, club = W.clubs[st.mgr.club], s = pl.c >= 0 ? W.clubs[pl.c] : null;
+  var D = G.CFG2.MGR_DEAL, W = st.world, club = W.clubs[G.mgr.job(st).club], s = pl.c >= 0 ? W.clubs[pl.c] : null;
   if (!s) return 1;
   var top3 = s.sq.slice().sort(function (a, b) { return W.players[b].o - W.players[a].o; }).slice(0, 3).indexOf(pl.i) >= 0;
   return G.clamp(D.FEE_P[k === 3 ? 1 : k] - (s.rep > club.rep + 6 ? 0.25 : 0) + (pl.y <= 1 ? 0.2 : 0) - (club.riv.indexOf(s.id) >= 0 ? 0.3 : 0) - (top3 ? 0.2 : 0), 0.05, 0.95);
@@ -108,9 +108,10 @@ G.mgrDeal.loanable = function (st, pl) { return pl.c >= 0 && pl.o < st.world.clu
 // The chance the player signs: wage choice wk, the role promised against the one he would get
 /** @param {State} st @param {Npc} pl @param {Deal} d @returns {number} */
 G.mgrDeal.playerP = function (st, pl, d) {
-  var D = G.CFG2.MGR_DEAL, W = st.world, club = W.clubs[st.mgr.club], from = pl.c >= 0 ? W.clubs[pl.c] : null, O = G.mgrSq.ORDER;
-  var up = O.indexOf(d.sr) - O.indexOf(d.want || G.mgrDeal.deserve(st, pl)), role = up < 0 ? D.ROLE_UP : up > 0 ? D.ROLE_DOWN : 0;
-  return G.clamp(D.BASE_P + D.WAGE_P[d.wk] + role + (from ? (club.rep - from.rep) / 40 : 0) - (pl.o > club.str + 6 ? G.CFG.MGR.STAR_NO : 0), 0.05, 0.95);
+  var D = G.CFG2.MGR_DEAL, W = st.world, club = W.clubs[G.mgr.job(st).club], from = pl.c >= 0 ? W.clubs[pl.c] : null, O = G.mgrSq.ORDER;
+  // at the player's step the deal has its wage and role
+  var up = O.indexOf(G.sure(d.sr)) - O.indexOf(d.want || G.mgrDeal.deserve(st, pl)), role = up < 0 ? D.ROLE_UP : up > 0 ? D.ROLE_DOWN : 0;
+  return G.clamp(D.BASE_P + D.WAGE_P[G.sure(d.wk)] + role + (from ? (club.rep - from.rep) / 40 : 0) - (pl.o > club.str + 6 ? G.CFG.MGR.STAR_NO : 0), 0.05, 0.95);
 };
 /** @param {State} st @param {Npc} pl @param {number} wk @returns {number} the wage of choice wk, k€ a week */
 G.mgrDeal.wage = function (st, pl, wk) { return Math.round(G.mgr.wageFor(st, pl) * G.CFG2.MGR_DEAL.WAGE[wk]); };
@@ -119,11 +120,11 @@ G.mgrDeal.wage = function (st, pl, wk) { return Math.round(G.mgr.wageFor(st, pl)
 // the club come before the wage)
 /** @param {State} st @param {Npc} pl @param {number} fee @param {number} wage @returns {string} */
 G.mgrDeal.can = function (st, pl, fee, wage) {
-  var m = st.mgr, W = st.world, club = W.clubs[m.club];
+  var m = G.mgr.job(st), W = st.world, club = W.clubs[m.club];
   if (!G.mgr.open(st)) return 'chiuso';
   if (!pl || pl.c === club.id || pl.ln !== undefined) return 'nessuno';
   if (m.neg[pl.i]) return 'ko';
-  if ((m.buys || 0) >= G.CFG.MGR.BUYS[st.S.block === 0 ? 0 : 1]) return 'max';
+  if ((m.buys || 0) >= G.CFG.MGR.BUYS[G.sure(st.S).block === 0 ? 0 : 1]) return 'max';
   if (club.sq.length >= G.CFG.SQUAD_MAX) return 'piena';
   if (fee > club.bud) return 'soldi';
   if (wage >= 0 && G.world.wageBill(W, club) + wage * 52 / 1000 > G.world.wageCap(club) * 1.3 + (m.wageRoom || 0)) return 'ingaggi';
@@ -133,7 +134,7 @@ G.mgrDeal.can = function (st, pl, fee, wage) {
 // Opens a negotiation (a free agent goes straight to the player). A counter-offer left open is turned down
 /** @param {State} st @param {PlayerId} id @returns {string} */
 G.mgrDeal.open = function (st, id) {
-  var m = st.mgr, pl = st.world.players[id], why = G.mgrDeal.can(st, pl, 0, -1);
+  var m = G.mgr.job(st), pl = st.world.players[id], why = G.mgrDeal.can(st, pl, 0, -1);
   if (why) return G.mgrDeal.WHY[why];
   if (m.deal && m.deal.step === 'counter' && m.deal.id !== id) m.neg[m.deal.id] = 'ko';
   m.deal = { id: id, step: pl.c >= 0 ? 'club' : 'player', fee: 0 };
@@ -150,7 +151,7 @@ G.mgrDeal.toPlayer = function (st, d) {
 // Step 1: an offer at FEE[k] of the price, or k = 3 a loan with an option to buy
 /** @param {State} st @param {number} k @returns {string} */
 G.mgrDeal.offer = function (st, k) {
-  var D = G.CFG2.MGR_DEAL, m = st.mgr, d = m.deal, W = st.world;
+  var D = G.CFG2.MGR_DEAL, m = G.mgr.job(st), d = m.deal, W = st.world;
   if (!d || d.step !== 'club') return '';
   var pl = W.players[d.id], s = W.clubs[pl.c], price = G.mgr.price(st, pl), loan = k === 3, fee = G.mgrDeal.r1(price * (loan ? D.LOAN_FEE : D.FEE[k]));
   if (loan && !G.mgrDeal.loanable(st, pl)) return '';
@@ -168,7 +169,7 @@ G.mgrDeal.offer = function (st, k) {
 // The club's counter-offer: yes moves on to the player, no closes the talks for this window
 /** @param {State} st @param {boolean} yes @returns {string} */
 G.mgrDeal.counter = function (st, yes) {
-  var m = st.mgr, d = m.deal;
+  var m = G.mgr.job(st), d = m.deal;
   if (!d || d.step !== 'counter') return '';
   var pl = st.world.players[d.id];
   if (!yes) { m.neg[d.id] = 'ko'; m.deal = null; return 'Trattativa chiusa.'; }
@@ -181,7 +182,7 @@ G.mgrDeal.counter = function (st, yes) {
 // Step 2: the contract offered to the player (wage, role, years). If he signs he arrives with the promised role
 /** @param {State} st @returns {string} */
 G.mgrDeal.sign = function (st) {
-  var m = st.mgr, d = m.deal, W = st.world, S = st.S;
+  var m = G.mgr.job(st), d = m.deal, W = st.world, S = G.sure(st.S);
   if (!d || d.step !== 'player') return '';
   var pl = W.players[d.id], wage = G.mgrDeal.wage(st, pl, d.wk || 0), why = G.mgrDeal.can(st, pl, d.fee, wage);
   if (why) return G.mgrDeal.WHY[why];
@@ -199,9 +200,9 @@ G.mgrDeal.sign = function (st) {
 // (the scenarios, and the assistant of phase G); 'ok' or why not
 /** @param {State} st @param {PlayerId} id @returns {string} */
 G.mgrDeal.quick = function (st, id) {
-  var m = st.mgr;
+  var m = G.mgr.job(st);
   if (G.mgrDeal.open(st, id)) return 'no';
-  if (m.deal.step === 'club') G.mgrDeal.offer(st, 1);
+  if (G.sure(m.deal).step === 'club') G.mgrDeal.offer(st, 1);  // G.mgrDeal.open has just made it
   if (m.deal && m.deal.step === 'counter') G.mgrDeal.counter(st, true);
   if (!m.deal || m.deal.step !== 'player') { if (m.deal) m.deal = null; return 'no'; }
   m.deal.wk = 1;

@@ -12,7 +12,7 @@ G.match.prepare = function (W) {
   W.clubs.forEach(function (club) {
     /** @type {Dict<number>} */
     var inXi = {};
-    club.xi.forEach(function (id) { inXi[id] = 1; });
+    G.sure(club.xi).forEach(function (id) { inXi[id] = 1; });
     /** @type {Dict<PlayerId[]>} */
     var bench = {};
     club.sq.forEach(function (id) {
@@ -37,10 +37,10 @@ G.match.sim = function (hs, as, rng) {
 // Build the side that takes the pitch. mp = main player participation {mins, start} or null
 /** @param {World} W @param {Club} club @param {MatchPart|null} mp @param {Player} p @param {Rng} rng @returns {MatchSide} */
 G.match.side = function (W, club, mp, p, rng) {
-  var C = G.CFG, ids = club.xi.slice(), /** @type {PlayerId[]} */ subs = [];
+  var C = G.CFG, ids = G.sure(club.xi).slice(), /** @type {PlayerId[]} */ subs = [];
   for (var i = 0; i < ids.length; i++) {
     if (rng.next() < C.ROTATION) {
-      var b = club.bench[W.players[ids[i]].r];
+      var b = G.sure(club.bench)[W.players[ids[i]].r];
       if (b && b.length) { var alt = b[rng.int(0, Math.min(1, b.length - 1))]; subs.push(ids[i]); ids[i] = alt; }
     }
   }
@@ -79,13 +79,13 @@ G.match.pickWeighted = function (w, rng) {
 // Distribute goals/assists and ratings for one side. Returns main player's {g, a, r} when involved.
 // Shooting and creativity a typical player of the role has above or below his overall (from GEN_BIAS),
 // so the player scores like an NPC of the same overall and beats it only with better finishing or passing
-/** @type {Dict<number[]>} */ G.match._ref = null; // per role: [shooting, creativity] bias, filled by G.match.ref
-/** @param {RoleKey} role @returns {number[]} */
+/** @type {Dict<number[]>|null} */ G.match._ref = null; // per role: [shooting, creativity] bias, filled by G.match.ref
+/** @param {string} role a role, or a position (M9 S5) @returns {number[]} */
 G.match.ref = function (role) {
   var R = G.match._ref || (G.match._ref = {});
   if (!R[role]) {
     /** @param {AttrKey} k */
-    var b = function (k) { var w = G.WEIGHTS[role][k] || 0, B = G.CFG.GEN_BIAS; for (var i = 0; i < B.length; i++) if (w >= B[i][0]) return B[i][1]; return 0; };
+    var b = function (k) { var w = (G.POS_WEIGHTS[role] || G.WEIGHTS[role] || G.pos.weights(role))[k] || 0, B = G.CFG.GEN_BIAS; for (var i = 0; i < B.length; i++) if (w >= B[i][0]) return B[i][1]; return 0; };
     R[role] = [b('fin') * 0.6 + b('tir') * 0.2 + b('tes') * 0.2, b('pas') * 0.5 + b('vis') * 0.5];
   }
   return R[role];
@@ -94,7 +94,7 @@ G.match.ref = function (role) {
 // Main player's effective shooting and creativity: overall, moved by SPEC x how much his attributes beat the role norm
 /** @param {Player} p @returns {number[]} */
 G.match.mainEff = function (p) {
-  var A = p.attrs, ref = G.match.ref(p.role), K = G.CFG.SPEC;
+  var A = p.attrs, ref = G.match.ref(G.pos.of(p)), K = G.CFG.SPEC;
   return [p.ovr + K * (A.fin * 0.6 + A.tir * 0.2 + A.tes * 0.2 - ref[0] - p.ovr), p.ovr + K * (A.pas * 0.5 + A.vis * 0.5 - ref[1] - p.ovr)];
 };
 
@@ -109,10 +109,11 @@ G.match.stats = function (W, side, gf, ga, isLg, p, mp, rng) {
     gw.push(C.GOAL_W[pl.r] * q); aw.push(C.ASSIST_W[pl.r] * q); g.push(0); a.push(0);
   }
   if (mainIdx >= 0) {
-    var f = mp.mins / 90;
+    var f = G.sure(mp).mins / 90;
     var eff = G.match.mainEff(p), shot = eff[0], crea = eff[1];
-    gw.push(C.GOAL_W[p.role] * Math.exp(shot / C.QUAL_DIV) * f);
-    aw.push(C.ASSIST_W[p.role] * Math.exp(crea / C.QUAL_DIV) * f);
+    var pg = G.pos.ga(p);  // what his position adds to the role's goals and assists (M9 S5)
+    gw.push(C.GOAL_W[p.role] * pg[0] * Math.exp(shot / C.QUAL_DIV) * f);
+    aw.push(C.ASSIST_W[p.role] * pg[1] * Math.exp(crea / C.QUAL_DIV) * f);
     g.push(0); a.push(0);
   }
   for (var i = 0; i < gf; i++) {
@@ -126,14 +127,14 @@ G.match.stats = function (W, side, gf, ga, isLg, p, mp, rng) {
       if (t >= 0) a[t]++;
     }
   }
-  var res = gf > ga ? 0.35 : gf < ga ? -0.35 : 0, /** @type {number[]} */ rt = side.mgr ? [] : null, /** @type {number[]} */ rx = side.mgr ? [] : null;
+  var res = gf > ga ? 0.35 : gf < ga ? -0.35 : 0, /** @type {number[]|null} */ rt = side.mgr ? [] : null, /** @type {number[]|null} */ rx = side.mgr ? [] : null;
   for (k = 0; k < n; k++) {
     var P = W.players[side.ids[k]], r = 6.3 + (P.o - side.avg) / C.RATING_DIV + res + g[k] * 0.9 + a[k] * 0.5 + rng.normal() * 0.55;
     if (P.r === 'POR') r += ga === 0 ? 0.7 : -0.3 * ga;
     else if ((P.r === 'DC' || P.r === 'TS') && ga === 0) r += 0.35;
     r = G.clamp(r, 3.5, 10);
     // the managed club keeps every rating and its gap from what the overall promised (the form, js/mgr-squad.js)
-    if (rt) { rt.push(r); rx.push(r - (6.3 + (P.o - side.avg) / C.RATING_DIV)); }
+    if (rt && rx) { rt.push(r); rx.push(r - (6.3 + (P.o - side.avg) / C.RATING_DIV)); }
     var cs = P.r === 'POR' && ga === 0 ? 1 : 0, s5 = P.s;
     if (isLg) { s5[0]++; s5[1] += g[k]; s5[2] += a[k]; s5[3] += cs; s5[4] += r; }
     s5[5]++; s5[6] += g[k]; s5[7] += a[k]; s5[8] += cs; s5[9] += r;
@@ -144,7 +145,7 @@ G.match.stats = function (W, side, gf, ga, isLg, p, mp, rng) {
     P.s[5]++; P.s[9] += r;
   });
   side.gl = g;
-  if (rt) { side.rt = rt; side.rx = rx; }
+  if (rt && rx) { side.rt = rt; side.rx = rx; }
   return mainIdx >= 0 ? { g: g[mainIdx], a: a[mainIdx] } : null;
 };
 
@@ -155,18 +156,20 @@ G.match.play = function (st, h, a, comp, neutral) {
   var mine = h === pid ? 'h' : a === pid ? 'a' : null;
   var mp = mine ? G.match.mainPart(st) : null;
   // the manager's club takes the pitch with his XI, formation and tactic
-  var mg = st.mgr && G.mgr.active(st) ? st.mgr.club : -1, mods = mg >= 0 ? G.mgrTeam.mods(st.mgr) : null;
+  var mg = st.mgr && G.mgr.active(st) ? G.mgr.job(st).club : -1;
+  if (h === mg || a === mg) G.mgrTac.beforeMatch(st, h === mg ? a : h);  // tactical familiarity (M9 S6)
+  var mods = mg >= 0 ? G.mgrTeam.mods(G.mgr.job(st), W, h === mg ? a : h) : null;
   var live = mg >= 0 ? G.mgrLive.today(st, mg, h, a) : null;  // played live: the first half is already played
-  var sh = h === mg ? G.mgrTeam.side(st, W.clubs[h]) : G.match.side(W, W.clubs[h], mine === 'h' ? mp : null, p, rng);
-  var sa = a === mg ? G.mgrTeam.side(st, W.clubs[a]) : G.match.side(W, W.clubs[a], mine === 'a' ? mp : null, p, rng);
+  var sh = h === mg ? G.mgrTeam.side(st, W.clubs[h], a, comp) : G.match.side(W, W.clubs[h], mine === 'h' ? mp : null, p, rng);
+  var sa = a === mg ? G.mgrTeam.side(st, W.clubs[a], h, comp) : G.match.side(W, W.clubs[a], mine === 'a' ? mp : null, p, rng);
   var hs = sh.str - (neutral ? G.CFG.HOME_ADV : 0);
   var res = live ? G.mgrLive.result(st, live, h === mg, h === mg ? sh : sa) : h === mg || a === mg ? G.mgrTeam.sim(hs, sa.str, h === mg ? mods : null, a === mg ? mods : null, rng) : G.match.sim(hs, sa.str, rng);
   var mh = G.match.stats(W, sh, res[0], res[1], comp.lg, p, mine === 'h' ? mp : null, rng);
   var ma = G.match.stats(W, sa, res[1], res[0], comp.lg, p, mine === 'a' ? mp : null, rng);
   // the decisive moment comes after the scorers are drawn, so its goal goes to the player (or to the opponents)
-  var mom = mine && !st.mgr ? G.moments.resolve(st, mine, h, a, res, comp, mp) : null, my = mine === 'h' ? mh : ma;
+  var mom = mine && !st.mgr ? G.moments.resolve(st, mine, h, a, res, comp, G.sure(mp)) : null, my = mine === 'h' ? mh : ma;
   if (mom && my) { my.g += mom.g; my.a += mom.a; }
-  if (mine) G.match.mainRecord(st, mine === 'h', h, a, res, mp, mine === 'h' ? mh : ma, comp, mine === 'h' ? sh : sa);
+  if (mine) G.match.mainRecord(st, mine === 'h', h, a, res, G.sure(mp), mine === 'h' ? mh : ma, comp, mine === 'h' ? sh : sa);
   if (mom) G.moments.report(st, mom, res[mine === 'h' ? 0 : 1], res[mine === 'h' ? 1 : 0]);
   if (h === mg || a === mg) G.mgr.matchRow(st, h === mg, h === mg ? a : h, res, comp, h === mg ? sh : sa);
   if (live) G.mgrLive.done(st, live, res, h === mg);
@@ -184,17 +187,17 @@ G.match.form = function (W, h, a, res) {
 // Decide the main player's minutes for this match
 /** @param {State} st @returns {MatchPart} */
 G.match.mainPart = function (st) {
-  var C = G.CFG, rng = G.rng, p = st.player, ps = st.S.ps;
+  var C = G.CFG, rng = G.rng, p = st.player, S = G.sure(st.S), ps = S.ps, pS = G.sure(S.pStart);  // set by G.season.beginBlock
   ps.matches++;
   if (p.inj > 0) { p.inj = Math.max(0, p.inj - (C.INTENSITY[p.plan.intensity].heal || 1)); ps.inj++; return { mins: 0, start: false, injured: true }; }
-  if (rng.chance(st.S.pStart)) { ps.starts++; return { mins: rng.chance(0.7) ? 90 : rng.int(60, 89), start: true }; }
-  if (rng.chance(C.SUB_CHANCE * (0.4 + st.S.pStart))) return { mins: rng.int(10, 30), start: false };
+  if (rng.chance(pS)) { ps.starts++; G.pos.started(st); return { mins: rng.chance(0.7) ? 90 : rng.int(60, 89), start: true }; }
+  if (rng.chance(C.SUB_CHANCE * (0.4 + pS))) return { mins: rng.int(10, 30), start: false };
   return { mins: 0, start: false };
 };
 
 /** @param {State} st @param {boolean} home @param {ClubId} h @param {ClubId} a @param {number[]} res @param {MatchPart} mp @param {{ g: number, a: number }|null} ga @param {MatchComp} comp @param {MatchSide} side */
 G.match.mainRecord = function (st, home, h, a, res, mp, ga, comp, side) {
-  var C = G.CFG, p = st.player, ps = st.S.ps, rng = G.rng, W = st.world;
+  var C = G.CFG, p = st.player, ps = G.sure(st.S).ps, rng = G.rng, W = st.world;
   var gf = home ? res[0] : res[1], gc = home ? res[1] : res[0], opp = home ? a : h;
   var derby = W.clubs[p.clubId].riv.indexOf(opp) >= 0;
   /** @type {MatchRow} */
@@ -204,15 +207,16 @@ G.match.mainRecord = function (st, home, h, a, res, mp, ga, comp, side) {
     var gk = p.role === 'POR';
     var r = C.RATING_BASE + row.g * 0.9 + row.a * 0.5 + (gf > gc ? 0.3 : gf < gc ? -0.3 : 0) +
       (p.ovr - side.avg) / C.RATING_DIV + rng.normal() * (0.45 - G.life.staff(p, 'mental') * 0.02) + (p.morale - 50) / 100 + (mp.mom ? mp.mom.bonus : 0);
-    if (gk || p.role === 'DC' || p.role === 'TS') r += gc === 0 ? (gk ? 0.8 : 0.5) : -0.2 * gc * (gk ? 1.2 : 1);
+    if (gk || G.pos.def(p)) r += gc === 0 ? (gk ? 0.8 : 0.5) : -0.2 * gc * (gk ? 1.2 : 1);
     if (mp.mins < 45) r = 6 + (r - 6) * 0.5;
     row.r = Math.round(G.clamp(r, 4, 10) * 10) / 10;
     ps.apps++; ps.mins += mp.mins; ps.goals += row.g; ps.assists += row.a; ps.rSum += row.r; ps.rN++;
     if (gk && gc === 0 && mp.start) ps.cs++;
+    if (!gk && G.pos.def(p) && gc === 0 && mp.start) ps.csd = (ps.csd || 0) + 1;  // a defender's clean sheets, for the awards (M9 S5)
     if (comp.lg) { ps.lg[0]++; ps.lg[1] += row.g; ps.lg[2] += row.a; ps.lg[3] += gk && gc === 0 && mp.start ? 1 : 0; ps.lg[4] += row.r; }
     p.form = p.form * 0.7 + (row.r - 6.5) * 0.3;
   }
   if (derby && mp.mins > 0) G.life.derby(st, opp, gf, gc);
-  if (st.S.today !== undefined) row.dt = st.S.today;
-  st.S.blockRows.push(row);
+  if (G.sure(st.S).today !== undefined) row.dt = G.sure(st.S).today;
+  G.sure(st.S).blockRows.push(row);
 };

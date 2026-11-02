@@ -5,7 +5,7 @@ G.recap = {};
 
 /** @param {State} st @param {SeasonRecord} rec @param {Dict<ClubId[]>} tables @returns {PlayerRecap} */
 G.recap.build = function (st, rec, tables) {
-  var S = st.S, p = st.player, W = st.world, R = st.roll[0], club = W.clubs[rec.clubId], key = club.lg, ids = tables[key];
+  var S = G.sure(st.S), p = st.player, W = st.world, R = st.roll[0], club = W.clubs[rec.clubId], key = club.lg, ids = tables[key];
   var tab = S.lg[key].tab, me = rec.pos - 1, L = G.leagueByKey(key), s0 = S.start0 || { ovr: p.ovr, fame: p.fame, money: p.money + p.invest };
   var table = ids.map(function (id, i) { return { pos: i + 1, id: id, pts: tab[id][6], gd: tab[id][4] - tab[id][5], me: i === me }; })
     .filter(function (x) { return x.pos <= 3 || Math.abs(x.pos - 1 - me) <= 1 || x.pos > ids.length - 2; });
@@ -62,7 +62,7 @@ G.recap.render = function (st) {
     (R.boot ? '<div class="small">👢 Scarpa d’Oro: ' + who(R.boot, 'g') + ' <span class="muted">(contano solo i gol in campionato)</span></div>' : '') +
     G.EU_KEYS.map(function (k) { return R.eu[k] ? '<div class="small">🏆 ' + G.CFG.UEFA[k].name + ': ' + R.eu[k] + '</div>' : ''; }).join('') +
     R.tours.map(function (t) { return '<div class="small">🌍 ' + t.n + ' ' + t.year + ': ' + U.nat(t.winner) + (t.mine ? ' <span class="muted">(' + U.flag(p.nat) + ' ' + t.mine.toLowerCase() + ')</span>' : '') + '</div>'; }).join('');
-  var ach = Object.keys(p.ach || {}).filter(function (id) { return p.ach[id] === R.year; }).map(function (id) {
+  var won = p.ach || {}, ach = Object.keys(won).filter(function (id) { return won[id] === R.year; }).map(function (id) {
     var a = G.ach.get(id); return '<div class="rc-badge">' + a[1] + ' ' + a[2] + '</div>';
   }).join('');
   return '<div class="recap"><button class="rc-skip" data-act="recap">Continua ▶</button><div class="recap-in">' +

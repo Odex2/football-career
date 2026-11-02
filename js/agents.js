@@ -3,7 +3,9 @@
 // and reopen or close to new clients at each transfer window.
 // Agent: { i id, n name, nt nation, s stars 1-5, fee %, fame needed, open, ret retired }
 
-G.agents = {}; /** @type {Agent[]} */ G.agents.pool = null;
+G.agents = {};
+/** @type {Agent[]|null} */
+G.agents.pool = null;
 
 /** @param {Agent} a @param {Rng} rng */
 G.agents.price = function (a, rng) {

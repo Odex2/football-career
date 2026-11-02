@@ -7,8 +7,8 @@ G.mgrAw = {};
 
 /** @param {State} st @param {string} name @param {number} tier @param {string} news */
 G.mgrAw.add = function (st, name, tier, news) {
-  var m = st.mgr; m.awards = m.awards || [];
-  m.awards.push({ name: name, year: st.S.year, w: tier === 2 ? 1 : 3, club: st.world.clubs[m.club].name });
+  var m = G.mgr.job(st); m.awards = m.awards || [];
+  m.awards.push({ name: name, year: G.sure(st.S).year, w: tier === 2 ? 1 : 3, club: st.world.clubs[m.club].name });
   G.news(st, '🏅 ' + news);
 };
 
@@ -22,7 +22,7 @@ G.mgrAw.snap = function (S, key) {
 
 /** @param {State} st @param {number} b */
 G.mgrAw.block = function (st, b) {
-  var m = st.mgr, S = st.S, club = st.world.clubs[m.club], key = club.lg, L = G.leagueByKey(key), now = G.mgrAw.snap(S, key);
+  var m = G.mgr.job(st), S = G.sure(st.S), club = st.world.clubs[m.club], key = club.lg, L = G.leagueByKey(key), now = G.mgrAw.snap(S, key);
   var old = m.snap && m.snap.year === S.year && m.snap.key === key ? m.snap.t : null;
   m.snap = { year: S.year, key: key, t: now };
   if (!old && b > 0) return;
@@ -34,7 +34,7 @@ G.mgrAw.block = function (st, b) {
 
 /** @param {State} st @param {Dict<ClubId[]>} tables @param {[ClubId, string][]} honours */
 G.mgrAw.season = function (st, tables, honours) {
-  var C = G.CFG.MGR_AW, m = st.mgr, W = st.world, club = W.clubs[m.club], L = G.leagueByKey(club.lg), ids = tables[club.lg];
+  var C = G.CFG.MGR_AW, m = G.mgr.job(st), W = st.world, club = W.clubs[m.club], L = G.leagueByKey(club.lg), ids = tables[club.lg];
   var byStr = ids.slice().sort(function (a, b) { return W.clubs[b].str - W.clubs[a].str; });
   var best = ids.map(function (id, i) { return [id, byStr.indexOf(id) - i + (i === 0 ? C.CHAMP : 0)]; }).sort(function (a, b) { return b[1] - a[1]; })[0];
   if (best[0] === club.id && best[1] >= 1) G.mgrAw.add(st, 'Manager dell’anno ' + L.name, L.tier, 'Manager dell’anno in ' + L.name);

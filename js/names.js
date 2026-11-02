@@ -69,6 +69,7 @@ G.DATA = {
     { id: 'URU', name: 'Uruguay', flag: '🇺🇾' }, { id: 'COL', name: 'Colombia', flag: '🇨🇴' }, { id: 'MAR', name: 'Marocco', flag: '🇲🇦' },
     { id: 'ECU', name: 'Ecuador', flag: '🇪🇨', w: 0.8 }, { id: 'PAR', name: 'Paraguay', flag: '🇵🇾', w: 0.6 }, { id: 'CHI', name: 'Cile', flag: '🇨🇱', w: 0.5 },
     { id: 'PER', name: 'Perù', flag: '🇵🇪', w: 0.4 }, { id: 'VEN', name: 'Venezuela', flag: '🇻🇪', w: 0.4 }, { id: 'BOL', name: 'Bolivia', flag: '🇧🇴', w: 0.3 }],
+  // first names, then surnames, split on spaces; a surname of two words is joined by _ (de_Jong), see G.squads.name
   names: {
     ENG: ['Jack Harry Oliver George James Charlie Alfie Mason Callum Kieran Reece Jordan Luke Ben Tom', 'Smith Walker Hughes Clarke Wright Taylor Phillips Cole Barnes Mitchell Turner Evans Green Baker Lewis Hill Hall Ward'],
     ESP: ['Pablo Sergio Álvaro Javier Pedro Marcos Iker Raúl Dani Hugo Adrián Mikel Unai Gonzalo Nico', 'García Martínez López Sánchez Pérez Gómez Ruiz Navarro Torres Moreno Romero Alonso Ortega Merino Herrera'],
@@ -76,8 +77,8 @@ G.DATA = {
     GER: ['Lukas Leon Jonas Felix Niklas Maximilian Tim Jan Kai Florian Julian Paul Moritz', 'Müller Schmidt Schneider Fischer Weber Wagner Becker Hoffmann Schulz Koch Richter Wolf Krause Lehmann'],
     FRA: ['Lucas Hugo Théo Louis Antoine Mathis Enzo Rayan Adrien Jules Bastien Nathan Benjamin', 'Martin Bernard Dubois Thomas Robert Petit Durand Leroy Moreau Laurent Lefebvre Girard Fontaine Roux'],
     POR: ['João Diogo Tiago Rúben Bruno Gonçalo Rafael Pedro Nuno André Miguel Francisco', 'Silva Santos Ferreira Pereira Costa Oliveira Rodrigues Martins Sousa Fernandes Gonçalves Neves'],
-    NED: ['Daan Sem Luuk Milan Thijs Jesse Bram Stijn Ruben Lars Tom Jurre', 'de Jong Jansen Bakker Visser Smit Meijer de Vries Mulder Bosman van Leeuwen de Boer Dekker'],
-    BEL: ['Arthur Noah Louis Jules Victor Lucas Mathis Arne Youri Axel Lander', 'Peeters Janssens Maes Jacobs Mertens Willems Claes Goossens Wouters De Smet Hermans Lambert'],
+    NED: ['Daan Sem Luuk Milan Thijs Jesse Bram Stijn Ruben Lars Tom Jurre', 'de_Jong Jansen Bakker Visser Smit Meijer de_Vries Mulder Bosman van_Leeuwen de_Boer Dekker'],
+    BEL: ['Arthur Noah Louis Jules Victor Lucas Mathis Arne Youri Axel Lander', 'Peeters Janssens Maes Jacobs Mertens Willems Claes Goossens Wouters De_Smet Hermans Lambert'],
     TUR: ['Arda Kerem Emre Hakan Burak Mert Can Yusuf Ömer Onur Serkan Kenan', 'Yılmaz Kaya Demir Şahin Çelik Aydın Öztürk Arslan Doğan Kılıç Yıldız Koç'],
     SCO: ['Callum Lewis Ross Scott Ryan Kyle Andrew Craig Jamie Euan Fraser', 'Robertson Thomson Murray Ferguson Christie Henderson Paterson Watson Reid Campbell Stewart'],
     KSA: ['Salem Fahad Abdullah Saud Nawaf Firas Mohammed Hassan Saleh Yasser Ali', 'Al-Harbi Al-Otaibi Al-Qahtani Al-Ghamdi Al-Zahrani Al-Mutairi Al-Malki Al-Amri Al-Shammari'],
@@ -99,7 +100,7 @@ G.DATA = {
     JPN: ['Haruto Yuto Sota Daichi Takumi Ren Kenta Riku Hiroki', 'Sato Suzuki Takahashi Tanaka Watanabe Yamamoto Nakamura Kobayashi Kato'],
     URU: ['Federico Santiago Martín Rodrigo Manuel Mathías José Facundo', 'Rodríguez Pereira Silva Fernández Sosa Méndez Acosta Cabrera'],
     COL: ['Luis Andrés Juan Camilo Daniel Sebastián Felipe Carlos', 'Díaz Rodríguez Gómez Sánchez Muñoz Ríos Castro Vargas'],
-    MAR: ['Youssef Hamza Mehdi Ayoub Bilal Anas Omar Rachid', 'Benali Alaoui Idrissi Bennani Tazi Chraibi El Amrani Berrada'],
+    MAR: ['Youssef Hamza Mehdi Ayoub Bilal Anas Omar Rachid', 'Benali Alaoui Idrissi Bennani Tazi Chraibi El_Amrani Berrada'],
     ECU: ['José Carlos Luis Andrés Ángel Félix Jorge Diego Byron Wilson', 'Vera Valencia Zambrano Mendoza Castillo Mora Plaza Cedeño Delgado Reyes'],
     PAR: ['Miguel Julio Antonio Gustavo Ramón Diego Ángel Omar Matías Junior', 'Benítez Giménez Ortiz Gómez Ayala Duarte Sosa Rojas Acosta Báez Galeano Cáceres'],
     CHI: ['Felipe Ignacio Cristóbal Matías Sebastián Benjamín Joaquín Vicente Tomás Diego', 'Muñoz Rojas Soto Contreras Silva Morales Sepúlveda Fuentes Torres Araya Espinoza Castillo'],
