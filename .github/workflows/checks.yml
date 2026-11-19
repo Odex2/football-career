@@ -1,0 +1,17 @@
+name: checks
+on: [push, pull_request]
+jobs:
+  checks:
+    # macOS (Apple Silicon) like the machine that recorded the fingerprints: one career
+    # (player-por-eng) ends with a different save on Linux x64
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # The fingerprints in tests/golden.json were recorded with Node 25.8.2: other versions
+          # can change a few of them (different floating-point results), so the version is pinned
+          node-version: 25.8.2
+      # TypeScript is only a type checker here; 5.9 is required (7.x breaks the global G namespace)
+      - run: npm install -g typescript@5.9
+      - run: node tests/run.js
